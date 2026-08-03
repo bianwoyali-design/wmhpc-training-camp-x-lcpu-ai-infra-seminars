@@ -17,6 +17,7 @@ ARCH_LOW  ?= 75
 FLAGS     ?= -O2 -std=c++17 -I.
 CLANGD_CUDA_PATH ?= /usr/local/cuda
 CLANGD_CUDA_ARCH ?= sm_75
+CLANGD_CUDA_COMPILER ?= /usr/local/cuda/bin/nvcc
 
 bin/%: %.cu common.h
 	@mkdir -p $(dir $@)
@@ -49,7 +50,7 @@ compile_commands.json:
 			first=0; \
 			printf '  {\n'; \
 			printf '    "directory": "%s",\n' "$(CURDIR)"; \
-			printf '    "command": "clang++ -xcuda -std=c++17 -I. -isystem %s/include/cccl --cuda-path=%s --cuda-gpu-arch=%s -c %s -o /dev/null",\n' "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_ARCH)" "$$src"; \
+			printf '    "command": "%s -std=c++17 -I. -isystem %s/include/cccl --cuda-path=%s --cuda-gpu-arch=%s -c %s -o /dev/null",\n' "$(CLANGD_CUDA_COMPILER)" "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_ARCH)" "$$src"; \
 			printf '    "file": "%s"\n' "$$src"; \
 			printf '  }'; \
 		done; \
