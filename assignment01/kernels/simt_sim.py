@@ -19,5 +19,50 @@ contract: 实现 run(program) -> (regs, cycles)
 """
 
 
+def exec(program, regs, active):
+    if not any(active):
+        return 0
+
+    cycles = 0
+
+    for inst in program:
+        comm = inst[0]
+
+        if comm == "add":
+            k = inst[1]
+            for i, is_active in enumerate(active):
+                if is_active:
+                    regs[i] += k
+            cycles += 1
+
+        elif comm == "mul":
+            k = inst[1]
+            for i, is_active in enumerate(active):
+                regs[i] *= k
+            cycles += 1
+
+        elif comm == "if_lt":
+            t, then_prog, else_prog = inst[1:]
+
+            then_mask = []
+            else_mask = []
+
+            for i, is_active in enumerate(active):
+                cond = is_active and regs[i] < t
+
+                then_mask.append(cond)
+                else_mask.append(is_active and not cond)
+
+            cycles += exec(then_prog, regs, then_mask)
+            cycles += exec(else_prog, regs, else_mask)
+
+    return cycles
+
+
 def run(program):
-    raise NotImplementedError("从这里开始写")
+    regs = list(range(32))
+    active = [True] * 32
+
+    cycles = exec(program, regs, active)
+
+    return regs, cycles

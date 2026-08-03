@@ -3,11 +3,11 @@
 #include "common.h"
 
 __global__ void hello() {
-    printf("hello from block %d, thread %d\n", blockIdx.x, threadIdx.x);
+  printf("hello from block %d, thread %d\n", blockIdx.x, threadIdx.x);
 }
 
 int main() {
-    hello<<<4, 8>>>();
-    CUDA_CHECK_KERNEL();
-    return 0;
+  hello<<<4, 8>>>();
+  CUDA_CHECK_KERNEL();
+  return 0;
 }

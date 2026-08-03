@@ -35,15 +35,100 @@
 // 选做第三版（shuffle 版）时：测试只会跑上面两个 kernel，自己在 main 里
 // 照着加一次 run_one 调用即可，不影响前两版的测试。
 #include "common.h"
+#include <cccl/cub/block/block_reduce.cuh>
 
 #define BLOCK 256
 
 __global__ void reduce_interleaved(const float *in, float *out) {
-    // TODO：从这里开始写（交错配对版本）
+  __shared__ float buf[BLOCK];
+  int base = blockIdx.x * BLOCK;
+  int tid = threadIdx.x;
+
+  buf[tid] = in[base + tid];
+  __syncthreads();
+  for (int s = 1; s < blockDim.x; s <<= 1) {
+    if (tid % (2 * s) == 0) {
+      buf[tid] += buf[tid + s];
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) {
+    out[blockIdx.x] = buf[0];
+  }
 }
 
 __global__ void reduce_contiguous(const float *in, float *out) {
-    // TODO：从这里开始写（连续配对版本）
+  __shared__ float buf[BLOCK];
+  int base = blockIdx.x * BLOCK;
+  int tid = threadIdx.x;
+
+  buf[tid] = in[base + tid];
+  __syncthreads();
+  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (tid < s) {
+      buf[tid] += buf[tid + s];
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) {
+    out[blockIdx.x] = buf[0];
+  }
+}
+
+__inline__ __device__ void warp_reduce_sum(float &val, unsigned mask) {
+  for (int offset = 16; offset > 0; offset >>= 1) {
+    val += __shfl_down_sync(mask, val, offset);
+  }
+}
+
+__global__ void reduce_shfl_down(const float *in, float *out) {
+  __shared__ float buf[BLOCK / 32];
+  int tid = threadIdx.x;
+  int lane = tid & 31;
+  int warp = tid / 32;
+
+  float sum = in[BLOCK * blockIdx.x + tid];
+  warp_reduce_sum(sum, 0xffffffff);
+
+  if (!lane) {
+    buf[warp] = sum;
+  }
+
+  __syncthreads();
+
+  if (!warp) {
+    int num_warps = BLOCK / 32;
+    float sum = (lane < num_warps) ? buf[lane] : 0.0f;
+
+    unsigned mask = __ballot_sync(0xffffffff, lane < num_warps);
+    warp_reduce_sum(sum, mask);
+
+    if (!lane) {
+      out[blockIdx.x] = sum;
+    }
+  }
+}
+
+__global__ void reduce_cub(const float *in, float *out) {
+  using BlockReduce = cub::BlockReduce<float, BLOCK>;
+
+  __shared__ typename BlockReduce::TempStorage temp;
+
+  int tid = threadIdx.x;
+
+  float sum = 0;
+
+  for (int i = blockIdx.x * BLOCK + tid; i < 4096 * BLOCK;
+       i += gridDim.x * BLOCK) {
+    sum += in[i];
+  }
+
+  sum = BlockReduce(temp).Sum(sum);
+
+  if (tid == 0)
+    out[blockIdx.x] = sum;
 }
 
 // ---------------- 以下是判测与计时，不要修改 ----------------
@@ -53,59 +138,65 @@ typedef void (*reduce_fn)(const float *, float *);
 static float run_one(reduce_fn fn, const char *name, const float *d_in,
                      float *d_out, float *h_out, const float *h_partial,
                      int nblocks) {
-    CUDA_CHECK(cudaMemset(d_out, 0, nblocks * sizeof(float)));
-    fn<<<nblocks, BLOCK>>>(d_in, d_out);
-    CUDA_CHECK_KERNEL();
-    CUDA_CHECK(cudaMemcpy(h_out, d_out, nblocks * sizeof(float),
-                          cudaMemcpyDeviceToHost));
-    if (!check_close(h_out, h_partial, nblocks, 1e-3f)) {
-        printf("%s: FAIL\n", name);
-        emit_result("3.5", "fail", "{}");
-        exit(1);
-    }
+  CUDA_CHECK(cudaMemset(d_out, 0, nblocks * sizeof(float)));
+  fn<<<nblocks, BLOCK>>>(d_in, d_out);
+  CUDA_CHECK_KERNEL();
+  CUDA_CHECK(cudaMemcpy(h_out, d_out, nblocks * sizeof(float),
+                        cudaMemcpyDeviceToHost));
+  if (!check_close(h_out, h_partial, nblocks, 1e-3f)) {
+    printf("%s: FAIL\n", name);
+    emit_result("3.5", "fail", "{}");
+    exit(1);
+  }
 
-    const int reps = 200;
-    GpuTimer timer;
-    timer.start();
-    for (int r = 0; r < reps; r++) fn<<<nblocks, BLOCK>>>(d_in, d_out);
-    float ms = timer.stop_ms() / reps;
-    CUDA_CHECK_KERNEL();
-    printf("%s: PASS  平均 %.4f ms\n", name, ms);
-    return ms;
+  const int reps = 200;
+  GpuTimer timer;
+  timer.start();
+  for (int r = 0; r < reps; r++)
+    fn<<<nblocks, BLOCK>>>(d_in, d_out);
+  float ms = timer.stop_ms() / reps;
+  CUDA_CHECK_KERNEL();
+  printf("%s: PASS  平均 %.4f ms\n", name, ms);
+  return ms;
 }
 
 int main() {
-    const int nblocks = 4096;
-    const int n = nblocks * BLOCK;
-    size_t bytes = (size_t)n * sizeof(float);
+  const int nblocks = 4096;
+  const int n = nblocks * BLOCK;
+  size_t bytes = (size_t)n * sizeof(float);
 
-    float *h_in = (float *)malloc(bytes);
-    float *h_out = (float *)malloc(nblocks * sizeof(float));
-    float *h_partial = (float *)malloc(nblocks * sizeof(float));
-    fill_random(h_in, n, 11);
-    for (int b = 0; b < nblocks; b++) {
-        double s = 0;
-        for (int t = 0; t < BLOCK; t++) s += h_in[b * BLOCK + t];
-        h_partial[b] = (float)s;
-    }
+  float *h_in = (float *)malloc(bytes);
+  float *h_out = (float *)malloc(nblocks * sizeof(float));
+  float *h_partial = (float *)malloc(nblocks * sizeof(float));
+  fill_random(h_in, n, 11);
+  for (int b = 0; b < nblocks; b++) {
+    double s = 0;
+    for (int t = 0; t < BLOCK; t++)
+      s += h_in[b * BLOCK + t];
+    h_partial[b] = (float)s;
+  }
 
-    float *d_in, *d_out;
-    CUDA_CHECK(cudaMalloc(&d_in, bytes));
-    CUDA_CHECK(cudaMalloc(&d_out, nblocks * sizeof(float)));
-    CUDA_CHECK(cudaMemcpy(d_in, h_in, bytes, cudaMemcpyHostToDevice));
+  float *d_in, *d_out;
+  CUDA_CHECK(cudaMalloc(&d_in, bytes));
+  CUDA_CHECK(cudaMalloc(&d_out, nblocks * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(d_in, h_in, bytes, cudaMemcpyHostToDevice));
 
-    float ms_i = run_one(reduce_interleaved, "interleaved", d_in, d_out, h_out,
-                         h_partial, nblocks);
-    float ms_c = run_one(reduce_contiguous, "contiguous ", d_in, d_out, h_out,
-                         h_partial, nblocks);
-    // 阈值 1.5x：A100 实测 2.22x、V100 实测 2.33x，两版写成一样时是 ~1x。
-    float ratio = report_speedup("interleaved / contiguous", ms_i, ms_c, 1.5f,
-                                 "两版耗时几乎一样，检查是不是写成同一个实现了");
+  float ms_i = run_one(reduce_interleaved, "interleaved", d_in, d_out, h_out,
+                       h_partial, nblocks);
+  float ms_c = run_one(reduce_contiguous, "contiguous ", d_in, d_out, h_out,
+                       h_partial, nblocks);
+  float ms_w = run_one(reduce_shfl_down, "warp shfl down", d_in, d_out, h_out,
+                       h_partial, nblocks);
+  float ms_cub =
+      run_one(reduce_cub, "cub", d_in, d_out, h_out, h_partial, nblocks);
+  // 阈值 1.5x：A100 实测 2.22x、V100 实测 2.33x，两版写成一样时是 ~1x。
+  float ratio = report_speedup("interleaved / contiguous", ms_i, ms_c, 1.5f,
+                               "两版耗时几乎一样，检查是不是写成同一个实现了");
 
-    char metrics[192];
-    snprintf(metrics, sizeof(metrics),
-             "{\"interleaved_ms\":%.4f,\"contiguous_ms\":%.4f,\"ratio\":%.3f}",
-             ms_i, ms_c, ratio);
-    emit_result("3.5", "pass", metrics);
-    return 0;
+  char metrics[192];
+  snprintf(metrics, sizeof(metrics),
+           "{\"interleaved_ms\":%.4f,\"contiguous_ms\":%.4f,\"ratio\":%.3f}",
+           ms_i, ms_c, ratio);
+  emit_result("3.5", "pass", metrics);
+  return 0;
 }

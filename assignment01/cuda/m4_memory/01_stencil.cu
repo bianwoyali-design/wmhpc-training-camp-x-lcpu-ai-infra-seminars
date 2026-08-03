@@ -11,85 +11,87 @@
 #define RADIUS 1
 
 __global__ void stencil_static(const float *in, float *out, int n) {
-    // ====== 空 1：静态 shared 数组，要装下 BLOCK 个元素加两侧 halo ======
-    __shared__ float tile[/* 填这里 */];
+  // ====== 空 1：静态 shared 数组，要装下 BLOCK 个元素加两侧 halo ======
+  __shared__ float tile[BLOCK + 2 * RADIUS];
 
-    int g = blockIdx.x * blockDim.x + threadIdx.x;  // 全局下标
-    int l = threadIdx.x + RADIUS;                   // 在 tile 里的位置
+  int g = blockIdx.x * blockDim.x + threadIdx.x; // 全局下标
+  int l = threadIdx.x + RADIUS;                  // 在 tile 里的位置
 
-    tile[l] = (g < n) ? in[g] : 0.f;
-    // 块两端的线程多搬一个 halo 元素。
-    if (threadIdx.x < RADIUS) {
-        int left = g - RADIUS;
-        int right = g + BLOCK;
-        tile[l - RADIUS] = (left >= 0) ? in[left] : 0.f;
-        tile[l + BLOCK] = (right < n) ? in[right] : 0.f;
-    }
+  tile[l] = (g < n) ? in[g] : 0.f;
+  // 块两端的线程多搬一个 halo 元素。
+  if (threadIdx.x < RADIUS) {
+    int left = g - RADIUS;
+    int right = g + BLOCK;
+    tile[l - RADIUS] = (left >= 0) ? in[left] : 0.f;
+    tile[l + BLOCK] = (right < n) ? in[right] : 0.f;
+  }
 
-    // ====== 空 2：在这里补上一行 ======
-    /* 填这里 */
+  // ====== 空 2：在这里补上一行 ======
+  __syncthreads();
 
-    if (g < n) {
-        // ====== 空 3：用 tile（不许用 in）算三点平均 ======
-        out[g] = /* 填这里 */;
-    }
+  if (g < n) {
+    // ====== 空 3：用 tile（不许用 in）算三点平均 ======
+    out[g] = (tile[l - 1] + tile[l] + tile[l + 1]) / 3.f;
+  }
 }
 
 __global__ void stencil_dynamic(const float *in, float *out, int n) {
-    // ====== 空 4：动态 shared 数组的声明方式（大小在 launch 时才给出） ======
-    /* 填这里（声明动态 shared 数组 tile）*/
+  // ====== 空 4：动态 shared 数组的声明方式（大小在 launch 时才给出） ======
+  extern __shared__ float tile[];
 
-    int g = blockIdx.x * blockDim.x + threadIdx.x;
-    int l = threadIdx.x + RADIUS;
+  int g = blockIdx.x * blockDim.x + threadIdx.x;
+  int l = threadIdx.x + RADIUS;
 
-    tile[l] = (g < n) ? in[g] : 0.f;
-    if (threadIdx.x < RADIUS) {
-        int left = g - RADIUS;
-        int right = g + BLOCK;
-        tile[l - RADIUS] = (left >= 0) ? in[left] : 0.f;
-        tile[l + BLOCK] = (right < n) ? in[right] : 0.f;
-    }
-    __syncthreads();
-    if (g < n) {
-        out[g] = (tile[l - 1] + tile[l] + tile[l + 1]) / 3.f;
-    }
+  tile[l] = (g < n) ? in[g] : 0.f;
+  if (threadIdx.x < RADIUS) {
+    int left = g - RADIUS;
+    int right = g + BLOCK;
+    tile[l - RADIUS] = (left >= 0) ? in[left] : 0.f;
+    tile[l + BLOCK] = (right < n) ? in[right] : 0.f;
+  }
+  __syncthreads();
+  if (g < n) {
+    out[g] = (tile[l - 1] + tile[l] + tile[l + 1]) / 3.f;
+  }
 }
 
 int main() {
-    const int n = 1000003;
-    size_t bytes = (size_t)n * sizeof(float);
+  const int n = 1000003;
+  size_t bytes = (size_t)n * sizeof(float);
 
-    float *h_in = (float *)malloc(bytes);
-    float *h_out = (float *)malloc(bytes);
-    float *h_ref = (float *)malloc(bytes);
-    fill_random(h_in, n, 3);
-    for (int i = 0; i < n; i++) {
-        float l = (i > 0) ? h_in[i - 1] : 0.f;
-        float r = (i < n - 1) ? h_in[i + 1] : 0.f;
-        h_ref[i] = (l + h_in[i] + r) / 3.f;
-    }
+  float *h_in = (float *)malloc(bytes);
+  float *h_out = (float *)malloc(bytes);
+  float *h_ref = (float *)malloc(bytes);
+  fill_random(h_in, n, 3);
+  for (int i = 0; i < n; i++) {
+    float l = (i > 0) ? h_in[i - 1] : 0.f;
+    float r = (i < n - 1) ? h_in[i + 1] : 0.f;
+    h_ref[i] = (l + h_in[i] + r) / 3.f;
+  }
 
-    float *d_in, *d_out;
-    CUDA_CHECK(cudaMalloc(&d_in, bytes));
-    CUDA_CHECK(cudaMalloc(&d_out, bytes));
-    CUDA_CHECK(cudaMemcpy(d_in, h_in, bytes, cudaMemcpyHostToDevice));
+  float *d_in, *d_out;
+  CUDA_CHECK(cudaMalloc(&d_in, bytes));
+  CUDA_CHECK(cudaMalloc(&d_out, bytes));
+  CUDA_CHECK(cudaMemcpy(d_in, h_in, bytes, cudaMemcpyHostToDevice));
 
-    int blocks = (n + BLOCK - 1) / BLOCK;
+  int blocks = (n + BLOCK - 1) / BLOCK;
 
-    stencil_static<<<blocks, BLOCK>>>(d_in, d_out, n);
-    CUDA_CHECK_KERNEL();
-    CUDA_CHECK(cudaMemcpy(h_out, d_out, bytes, cudaMemcpyDeviceToHost));
-    if (!check_close(h_out, h_ref, n)) REPORT(0);
-    printf("static  PASS\n");
+  stencil_static<<<blocks, BLOCK>>>(d_in, d_out, n);
+  CUDA_CHECK_KERNEL();
+  CUDA_CHECK(cudaMemcpy(h_out, d_out, bytes, cudaMemcpyDeviceToHost));
+  if (!check_close(h_out, h_ref, n))
+    REPORT(0);
+  printf("static  PASS\n");
 
-    CUDA_CHECK(cudaMemset(d_out, 0, bytes));
-    // ====== 空 5：动态 shared 版本的 launch——第三个参数该填多少字节？ ======
-    stencil_dynamic<<<blocks, BLOCK, /* 填这里 */>>>(d_in, d_out, n);
-    CUDA_CHECK_KERNEL();
-    CUDA_CHECK(cudaMemcpy(h_out, d_out, bytes, cudaMemcpyDeviceToHost));
-    if (!check_close(h_out, h_ref, n)) REPORT(0);
-    printf("dynamic PASS\n");
+  CUDA_CHECK(cudaMemset(d_out, 0, bytes));
+  // ====== 空 5：动态 shared 版本的 launch——第三个参数该填多少字节？ ======
+  stencil_dynamic<<<blocks, BLOCK, 258 * sizeof(float)>>>(d_in, d_out, n);
+  CUDA_CHECK_KERNEL();
+  CUDA_CHECK(cudaMemcpy(h_out, d_out, bytes, cudaMemcpyDeviceToHost));
+  if (!check_close(h_out, h_ref, n))
+    REPORT(0);
+  printf("dynamic PASS\n");
 
-    REPORT(1);
-    return 0;
+  REPORT(1);
+  return 0;
 }

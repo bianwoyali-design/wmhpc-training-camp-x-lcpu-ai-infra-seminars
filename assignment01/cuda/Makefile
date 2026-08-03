@@ -15,6 +15,8 @@ ARCH_HIGH ?= 90
 # CUDA 13 起 compute_70 已被移除，低架构实验默认用 75（CUDA 12/13 都支持）
 ARCH_LOW  ?= 75
 FLAGS     ?= -O2 -std=c++17 -I.
+CLANGD_CUDA_PATH ?= /usr/local/cuda
+CLANGD_CUDA_ARCH ?= sm_75
 
 bin/%: %.cu common.h
 	@mkdir -p $(dir $@)
@@ -37,7 +39,28 @@ ptxonly/%: %.cu common.h
 	$(NVCC) $(FLAGS) -gencode arch=compute_$(ARCH_LOW),code=compute_$(ARCH_LOW) -o bin/$*_ptxonly $<
 	@echo "已生成 bin/$*_ptxonly（只含 compute_$(ARCH_LOW) 的 PTX）"
 
-clean:
-	rm -rf bin */*.ptx
+compile_commands.json:
+	@tmp=$@.tmp; \
+	{ \
+		printf '[\n'; \
+		first=1; \
+		find . -type f -name '*.cu' -not -path './bin/*' -not -path './.git/*' -not -path './.vscode/*' | sort | while IFS= read -r src; do \
+			[ "$$first" -eq 1 ] || printf ',\n'; \
+			first=0; \
+			printf '  {\n'; \
+			printf '    "directory": "%s",\n' "$(CURDIR)"; \
+			printf '    "command": "clang++ -xcuda -std=c++17 -I. -isystem %s/include/cccl --cuda-path=%s --cuda-gpu-arch=%s -c %s -o /dev/null",\n' "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_ARCH)" "$$src"; \
+			printf '    "file": "%s"\n' "$$src"; \
+			printf '  }'; \
+		done; \
+		printf '\n]\n'; \
+	} > "$$tmp"; \
+	mv "$$tmp" $@; \
+	echo "已生成 $@"
 
-.PHONY: run/% ptx/% sassonly/% ptxonly/% clean
+clean:
+	rm -rf bin */*.ptx compile_commands.json
+
+.PHONY: run/% ptx/% sassonly/% ptxonly/% clean clangd-db
+
+clangd-db: compile_commands.json
