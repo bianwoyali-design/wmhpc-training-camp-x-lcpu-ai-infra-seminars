@@ -5,5 +5,23 @@
     "--completion-style=detailed",
     "--header-insertion=iwyu"
   ],
-  "python.analysis.typeCheckingMode": "off"
+  "tilelang.pythonPath": "/home/lcpu/73345528/wmhpc-training-camp-x-lcpu-ai-infra-seminars/assignment01/.venv/bin/python",
+  "python.languageServer": "Pylance",
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportArgumentType": "none",
+    "reportCallIssue": "none",
+    "reportInvalidTypeForm": "none",
+    "reportGeneralTypeIssues": "none",
+    "reportAttributeAccessIssue": "none"
+  },
+  "editor.semanticHighlighting.enabled": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  }
 }
