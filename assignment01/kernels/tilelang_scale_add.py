@@ -5,7 +5,6 @@ Y = 2 * X + 1，X 形状 (M, N)。两个空对应 TileLang 的两个 basic opera
     pytest tests/test_tilelang.py -k scale_add
 """
 
-import tilelang
 import tilelang.language as T
 
 

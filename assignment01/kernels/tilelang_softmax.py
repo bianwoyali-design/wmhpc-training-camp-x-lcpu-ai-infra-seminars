@@ -26,7 +26,6 @@ import torch
 _KERNEL_CACHE = {}
 
 
-@tilelang.jit
 def make_softmax(
     M: int,
     N: int,
