@@ -28,7 +28,7 @@ int main() {
   CUDA_CHECK_KERNEL();
 
   const int reps = 20;
-  int strides[] = {1, 3, 5, 7, 15, 31};
+  int strides[] = {1, 2, 4, 8, 16, 32};
   printf("%8s %12s %12s\n", "stride", "ms", "GB/s");
   for (int s : strides) {
     GpuTimer timer;
