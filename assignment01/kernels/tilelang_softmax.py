@@ -29,7 +29,7 @@ _KERNEL_CACHE = {}
 def make_softmax(
     M: int,
     N: int,
-    threads: int = 128,
+    threads: int = 256,
     dtype="float32",
 ):
     BLOCK_N = max(1 << (N - 1).bit_length(), 128)
