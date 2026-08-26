@@ -19,21 +19,28 @@
 //
 // 判测真值来自在 B300 上实际发 tcgen05 验证过的描述符(3.2 的程序用的
 // 就是这三组)。运行:make run/m2_smem/02_descriptor(无卡可判)。
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 
 // TODO (a):实现位域编码。
 static uint64_t make_desc(uint32_t saddr, uint32_t lbo, uint32_t sbo,
                           uint32_t layout) {
-    (void)saddr; (void)lbo; (void)sbo; (void)layout;
-    return 0;
+  uint64_t desc = 0;
+
+  desc |= ((uint64_t)(saddr >> 4) & 0x3fff) << 0;
+  desc |= ((uint64_t)(lbo >> 4) & 0x3fff) << 16;
+  desc |= ((uint64_t)(sbo >> 4) & 0x3fff) << 32;
+  desc |= ((uint64_t)1 & 0x3) << 46;
+  desc |= ((uint64_t)layout & 0x7) << 61;
+
+  return desc;
 }
 
 // TODO (b):三个场景的 {LBO 字节, SBO 字节, layout 编码}。
 static const uint32_t SCEN[3][3] = {
-    {0, 0, 0},  // 场景 1
-    {0, 0, 0},  // 场景 2
-    {0, 0, 0},  // 场景 3
+    {128, 1024, 0}, // 场景 1
+    {0, 1024, 2},   // 场景 2
+    {0, 1024, 2},   // 场景 3
 };
 
 // 以下为判测,不需要修改。不匹配时按字段报差异,不打印期望值。
@@ -42,28 +49,32 @@ static const uint64_t TRUTH[3] = {0x0000404000080100ull, 0x4000404000000200ull,
                                   0x4000404000000300ull};
 
 static void field_diff(uint64_t got, uint64_t want) {
-    struct { const char* name; int lo, w; } f[] = {
-        {"start_address", 0, 14}, {"LBO", 16, 14}, {"SBO", 32, 14},
-        {"version", 46, 2}, {"base_offset", 49, 3}, {"layout_type", 61, 3}};
-    for (auto& x : f) {
-        uint64_t g = (got >> x.lo) & ((1ull << x.w) - 1);
-        uint64_t w = (want >> x.lo) & ((1ull << x.w) - 1);
-        if (g != w) printf("    字段 %s 不一致(yours=0x%llx)\n", x.name,
-                           (unsigned long long)g);
-    }
+  struct {
+    const char *name;
+    int lo, w;
+  } f[] = {{"start_address", 0, 14}, {"LBO", 16, 14},
+           {"SBO", 32, 14},          {"version", 46, 2},
+           {"base_offset", 49, 3},   {"layout_type", 61, 3}};
+  for (auto &x : f) {
+    uint64_t g = (got >> x.lo) & ((1ull << x.w) - 1);
+    uint64_t w = (want >> x.lo) & ((1ull << x.w) - 1);
+    if (g != w)
+      printf("    字段 %s 不一致(yours=0x%llx)\n", x.name,
+             (unsigned long long)g);
+  }
 }
 
 int main() {
-    int bad = 0;
-    for (int i = 0; i < 3; i++) {
-        uint64_t got = make_desc(ADDR[i], SCEN[i][0], SCEN[i][1], SCEN[i][2]);
-        if (got != TRUTH[i]) {
-            printf("场景 %d FAIL:\n", i + 1);
-            field_diff(got, TRUTH[i]);
-            bad++;
-        } else {
-            printf("场景 %d PASS\n", i + 1);
-        }
+  int bad = 0;
+  for (int i = 0; i < 3; i++) {
+    uint64_t got = make_desc(ADDR[i], SCEN[i][0], SCEN[i][1], SCEN[i][2]);
+    if (got != TRUTH[i]) {
+      printf("场景 %d FAIL:\n", i + 1);
+      field_diff(got, TRUTH[i]);
+      bad++;
+    } else {
+      printf("场景 %d PASS\n", i + 1);
     }
-    return bad != 0;
+  }
+  return bad != 0;
 }

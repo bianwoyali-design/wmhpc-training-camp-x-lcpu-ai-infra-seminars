@@ -16,64 +16,63 @@
 //
 // 运行:make -B bin/m1_sm80/05_ldsm_stride &&
 //      ./bin/m1_sm80/05_ldsm_stride
-#include <cuda_fp16.h>
-#include <cstdint>
 #include "../common.h"
+#include <cstdint>
+#include <cuda_fp16.h>
 
 constexpr int ITERS = 4096;
 
 // 8 个 warp 同发把 LSU 打满,吞吐由 bank 冲突决定;单 warp 的话
 // 流水会把串行化掩掉大半。每 warp 用自己的 smem 区域,访问模式相同。
 template <int STRIDE>
-__global__ void ldsm_kernel(unsigned* out, long long* cycles) {
-    constexpr int WARPS = 8;
-    __shared__ uint8_t smem[WARPS * 16 * 160];
-    for (int i = threadIdx.x; i < WARPS * 16 * 160; i += WARPS * 32)
-        smem[i] = (uint8_t)i;
-    __syncthreads();
-    int lane = threadIdx.x & 31, w = threadIdx.x >> 5;
-    int r = lane & 15, h = lane >> 4;
-    unsigned addr = (unsigned)__cvta_generic_to_shared(
-        &smem[w * 16 * 160 + r * STRIDE + h * 16]);
-    unsigned acc = 0, r0, r1, r2, r3;
-    __syncthreads();
-    long long t0 = clock64();
-    for (int i = 0; i < ITERS; i++) {
-        asm volatile(
-            "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0,%1,%2,%3}, [%4];\n"
-            : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
-            : "r"(addr));
-        acc ^= r0 ^ r1 ^ r2 ^ r3;
-    }
-    long long t1 = clock64();
-    __syncthreads();
-    if (threadIdx.x == 0) {
-        *cycles = t1 - t0;
-        *out = acc;
-    }
+__global__ void ldsm_kernel(unsigned *out, long long *cycles) {
+  constexpr int WARPS = 8;
+  __shared__ uint8_t smem[WARPS * 16 * 160];
+  for (int i = threadIdx.x; i < WARPS * 16 * 160; i += WARPS * 32)
+    smem[i] = (uint8_t)i;
+  __syncthreads();
+  int lane = threadIdx.x & 31, w = threadIdx.x >> 5;
+  int r = lane & 15, h = lane >> 4;
+  unsigned addr = (unsigned)__cvta_generic_to_shared(
+      &smem[w * 16 * 160 + r * STRIDE + h * 16]);
+  unsigned acc = 0, r0, r1, r2, r3;
+  __syncthreads();
+  long long t0 = clock64();
+  for (int i = 0; i < ITERS; i++) {
+    asm volatile(
+        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0,%1,%2,%3}, [%4];\n"
+        : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
+        : "r"(addr));
+    acc ^= r0 ^ r1 ^ r2 ^ r3;
+  }
+  long long t1 = clock64();
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    *cycles = t1 - t0;
+    *out = acc;
+  }
 }
 
-template <int STRIDE>
-static void run_one(const char* name) {
-    unsigned* dout;
-    long long* dcyc;
-    CUDA_CHECK(cudaMalloc(&dout, 4));
-    CUDA_CHECK(cudaMalloc(&dcyc, 8));
-    ldsm_kernel<STRIDE><<<1, 256>>>(dout, dcyc);  // warmup
-    ldsm_kernel<STRIDE><<<1, 256>>>(dout, dcyc);
-    CUDA_CHECK_KERNEL();
-    long long cyc;
-    CUDA_CHECK(cudaMemcpy(&cyc, dcyc, 8, cudaMemcpyDeviceToHost));
-    printf("stride %-8s %6.2f cycles / ldmatrix(8 warp 均摊)\n", name,
-           (double)cyc / ITERS);
-    cudaFree(dout);
-    cudaFree(dcyc);
+template <int STRIDE> static void run_one(const char *name) {
+  unsigned *dout;
+  long long *dcyc;
+  CUDA_CHECK(cudaMalloc(&dout, 4));
+  CUDA_CHECK(cudaMalloc(&dcyc, 8));
+  ldsm_kernel<STRIDE><<<1, 256>>>(dout, dcyc); // warmup
+  ldsm_kernel<STRIDE><<<1, 256>>>(dout, dcyc);
+  CUDA_CHECK_KERNEL();
+  long long cyc;
+  CUDA_CHECK(cudaMemcpy(&cyc, dcyc, 8, cudaMemcpyDeviceToHost));
+  printf("stride %-8s %6.2f cycles / ldmatrix(8 warp 均摊)\n", name,
+         (double)cyc / ITERS);
+  cudaFree(dout);
+  cudaFree(dcyc);
 }
 
 int main() {
-    run_one<32>("32B");
-    run_one<64>("64B");
-    run_one<128>("128B");
-    run_one<144>("128B+pad");
-    return 0;
+  run_one<32>("32B");
+  run_one<64>("64B");
+  run_one<128>("128B");
+  run_one<144>("128B+pad");
+  return 0;
 }

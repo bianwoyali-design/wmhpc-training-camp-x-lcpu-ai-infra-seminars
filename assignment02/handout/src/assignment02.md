@@ -120,14 +120,21 @@ make run/m1_sm80/01_fragment_map
 A 的同一个 b32 寄存器中的 4 个 fp8 元素沿矩阵哪个方向相邻？
 这个布局对 1.4 中使用 ldmatrix load 有什么影响？
 
+A 的同一个 b32 中四个 FP8 元素具有相同的行坐标，并沿列/K 维
+连续。由于 ldmatrix.b16 按原始 16 bit 搬运，可将每两个相邻
+ FP8 视作一个 b16，使两个 b16 自然组成 MMA 所需的一个 b32；
+ A 的 row-major shared-memory 布局与该装载方向一致。
+
 ### 1.2 {.prob type=DEBUG file=cuda/m1_sm80/02_bug_fragment.cu}
 
 这个程序发一条 m16n8k16 fp16 mma，判测会 FAIL。先运行一遍，后改动:
 
 (a) 描述症状：D 的哪些位置错、错成了什么(和对的部分是什么关系)；
+    D 的下半块复制上半块。
 
 (b) 修好它，并解释错的是哪个 fragment 的哪部分映射，为什么恰好产生(a)的症状。
-
+    A fragment 的下半行映射缺少 +8 行偏移，导致上下半区使用相同的 A 数据。
+    
 ```
 cd assignment02/cuda
 make run/m1_sm80/02_bug_fragment
@@ -186,10 +193,10 @@ ncu --metrics l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum,l1tex__data_b
 
 | 档位 | 预测 wavefront 比 | 实测 wavefront | 实测 conflict | 平均 cycle |
 |---|---|---|---|---|
-| 32 B | | | | |
-| 64 B | | | | |
-| 128 B | | | | |
-| 128+16 B | | | | |
+| 32 B |8|16384|8192|9.72|
+| 64 B |16|32768|24576|10.75|
+| 128 B |32|65536|57344|16.06|
+| 128+16 B |4|8192|0|9.23|
 
 比较预测与实测结果：哪一种行跨度使 wavefront 数增加到 4 倍？
 wavefront 的比例应与 bank 模型一致，但实际耗时的差距通常没有这么大。
