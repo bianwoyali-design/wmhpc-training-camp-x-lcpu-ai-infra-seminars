@@ -36,7 +36,11 @@ def gemm_scale_per_row_col(A: torch.Tensor, B: torch.Tensor,
     TODO: 先用 row/column scale 得到归一化的 A、B，完整点积后
     在输出 [M, N] 上乘回 scale 乘积。
     """
-    raise NotImplementedError
+    M, N = A.shape[0], B.shape[0]
+    qA = A.double() / sA[:, None]
+    qB = B.double() / sB[:, None]
+    result = qA @ qB.T
+    return result * sA[:, None] * sB[None, :]
 
 
 def gemm_scale_along_k(A: torch.Tensor, B: torch.Tensor,
@@ -46,7 +50,15 @@ def gemm_scale_along_k(A: torch.Tensor, B: torch.Tensor,
     TODO: 逐个 K block 计算归一化 partial sum，在段末乘回
     该段的 sA*sB，再累加。返回 [M, N] 的 fp64 结果。
     """
-    raise NotImplementedError
+    M, K = A.shape
+    N = B.shape[0]
+    scaled_sum = torch.zeros((M, N), dtype=torch.float64)
+    for block in range(K // SEG):
+        sl = slice(block * SEG, (block + 1) * SEG)
+        qA = A[:, sl].double() / sA[:, block, None]
+        qB = B[:, sl].double() / sB[:, block, None]
+        scaled_sum += qA @ qB.T * sA[:, block, None] * sB[None, :, block]
+    return scaled_sum
 
 
 def gemm_scale_along_k_one_restore(A: torch.Tensor, B: torch.Tensor,

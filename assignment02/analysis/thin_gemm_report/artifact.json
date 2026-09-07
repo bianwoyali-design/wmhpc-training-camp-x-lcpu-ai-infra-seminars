@@ -1,0 +1,309 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "B300 SXM 瘦 GEMM 实测分析",
+    "description": "基于七个 Kimi K3 投影形状的 cuBLAS BF16 实测，分析 M 变化、roofline 达成率与 skinny kernel 的选择。",
+    "generatedAt": "2026-08-30T00:00:00Z",
+    "filters": [],
+    "cards": [],
+    "charts": [
+      {
+        "id": "throughput_trend",
+        "title": "TFLOPS 随 M 的变化",
+        "subtitle": "六个常规 K 形状取同一 M 下的平均值；M 为九个离散采样点并等距显示。",
+        "showDescription": true,
+        "type": "line",
+        "dataset": "trend_summary",
+        "sourceId": "benchmark_output",
+        "encodings": {
+          "x": {
+            "field": "m_label",
+            "type": "ordinal",
+            "label": "M"
+          },
+          "y": {
+            "field": "tflops",
+            "type": "quantitative",
+            "label": "TFLOPS"
+          },
+          "color": {
+            "field": "series",
+            "type": "nominal",
+            "label": "形状组"
+          },
+          "tooltip": [
+            {
+              "field": "tc_peak_pct",
+              "type": "quantitative",
+              "label": "Tensor Core 峰值达成率",
+              "unit": "%"
+            }
+          ]
+        },
+        "xAxisTitle": "M（离散、等距）",
+        "yAxisTitle": "实测吞吐（TFLOPS）",
+        "valueFormat": "number",
+        "unit": "TFLOPS",
+        "surface": {
+          "palettePolicy": "hard-two-root-cap",
+          "seriesColors": {
+            "六个常规 K 形状平均": "#1473E6",
+            "f_b_proj (K=128)": "#C58B19"
+          }
+        }
+      },
+      {
+        "id": "low_m_bw",
+        "title": "M≤16 的 memory-roof 达成率",
+        "subtitle": "每个形状对 M=1、8、16 的 %BW 取平均；数值越高，带宽 roof 对实测性能的解释力越强。",
+        "showDescription": true,
+        "type": "horizontalBar",
+        "dataset": "low_m_roof",
+        "sourceId": "benchmark_output",
+        "encodings": {
+          "x": {
+            "field": "bw_mean_pct",
+            "type": "quantitative",
+            "label": "平均 %BW",
+            "unit": "%"
+          },
+          "y": {
+            "field": "layer",
+            "type": "nominal",
+            "label": "层"
+          },
+          "tooltip": [
+            {
+              "field": "bw_min_pct",
+              "type": "quantitative",
+              "label": "最小 %BW",
+              "unit": "%"
+            },
+            {
+              "field": "bw_max_pct",
+              "type": "quantitative",
+              "label": "最大 %BW",
+              "unit": "%"
+            },
+            {
+              "field": "tc_max_pct",
+              "type": "quantitative",
+              "label": "最大 %TCpeak",
+              "unit": "%"
+            }
+          ]
+        },
+        "xAxisTitle": "平均 memory-roof 达成率（%）",
+        "yAxisTitle": "层",
+        "valueFormat": "number",
+        "unit": "%",
+        "surface": {
+          "palettePolicy": "single-root-preferred",
+          "rootColor": "#1473E6"
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "platform_table",
+        "title": "M≥4096 的平台统计",
+        "subtitle": "每层对 M=4096、16384、65536 三点汇总；f_b_proj 尚未形成与其他层相同的 compute 平台。",
+        "showDescription": true,
+        "dataset": "platform_summary",
+        "sourceId": "benchmark_output",
+        "density": "comfortable",
+        "defaultSort": {
+          "field": "tc_avg_pct",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "layer",
+            "label": "层",
+            "type": "text"
+          },
+          {
+            "field": "tf_avg",
+            "label": "平均 TFLOPS",
+            "format": "number",
+            "unit": "TFLOPS",
+            "align": "right"
+          },
+          {
+            "field": "tf_range",
+            "label": "TFLOPS 范围",
+            "type": "text",
+            "align": "right"
+          },
+          {
+            "field": "tc_avg_pct",
+            "label": "平均 %TCpeak",
+            "format": "number",
+            "unit": "%",
+            "align": "right"
+          },
+          {
+            "field": "tc_range",
+            "label": "%TCpeak 范围",
+            "type": "text",
+            "align": "right"
+          },
+          {
+            "field": "bw_avg_pct",
+            "label": "平均 %BW",
+            "format": "number",
+            "unit": "%",
+            "align": "right"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "benchmark_output",
+        "label": "B300 SXM thin GEMM benchmark output",
+        "path": "pasted-text.txt"
+      },
+      {
+        "id": "benchmark_program",
+        "label": "05_thin_gemm.cu benchmark source",
+        "path": "assignment02/cuda/m4_gemm/05_thin_gemm.cu"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# B300 SXM 瘦 GEMM 实测分析"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## 技术结论\n\n- **(a) 明显下降发生在 M 从 1024 继续减小之后，M=256 时已经全面塌陷。** 排除 K=128 的 `f_b_proj` 后，六个常规形状的平均 Tensor Core 峰值达成率从 M≥4096 平台的约 79%，降到 M=1024 的 62.3%、M=256 的 39.2%、M=64 的 12.2%，到 M=16 只剩 3.3%。六个形状在 M=4096–65536 基本进入平台，实测约 1.63–2.01 PFLOPS，单层平台达成率约 72%–90%。\n\n- **(b) 小 M 下最接近显存带宽 roof 的是 `dense_gate_up_proj`、`in_proj_qkvgfab`、`o_proj` 和 `dense_down_proj`。** 它们在 M≤16 时 `%BW` 约为 57%–80%，但 `%TCpeak` 仅 0.2%–4.4%，符合低 AI 的 memory-side 限制。`fused_qkv_a_proj` 为混合限制；`q_b_proj` 和小 M 的 `f_b_proj` 两种达成率都低，不能归因成单纯的 HBM 带宽饱和。\n\n- **(c) `f_b_proj` 的根因是 K=128 造成的短 reduction、有限 CTA 并行度和固定开销难以摊薄。** 它的理论 AI 上限只有 118.15 FLOP/byte，低于 B300 SXM 的 281.25 FLOP/byte 机器平衡点，因此大 M 时也不可能进入 compute-bound；小 M 时又因为传输规模和工作量太小，连带宽 roof 也无法吃满。\n\n- **(d) M≤16 时 Tensor Core 的高峰值几乎没有转化为有效吞吐。** 此区间所有形状的 `%TCpeak` 不超过 4.4%，kernel 时间主要由固定启动、调度、tile/TMA setup、尾部与低并行度决定。skinny CUDA Core kernel 省去这些 Tensor Core 路径开销，因此即使计算峰值更低，端到端延迟仍可能更好。"
+      },
+      {
+        "id": "trend_finding",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## 常规形状在 M≥4096 进入平台，M≤256 明显塌陷\n\n六个常规 K 形状的平均吞吐在 M=4096、16384、65536 分别为 1761、1781、1790 TFLOPS：M 增加 16 倍，吞吐只增加约 1.7%，可视为相对稳定的平台。向小 M 方向看，M=1024 已比平台低约 21%，M=256 低约 50%，所以可以把 **M=1024 视为过渡区、M≤256 视为明显塌陷区**。`f_b_proj` 不属于同一 compute 平台：它一直随 M 增长，到 M=65536 仍只有 692 TFLOPS。"
+      },
+      {
+        "id": "trend_chart_block",
+        "type": "chart",
+        "chartId": "throughput_trend"
+      },
+      {
+        "id": "platform_detail",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## 平台达成率由形状决定，而不是一个统一常数\n\n平台最高的是 `o_proj`，M≥4096 平均达到 87.1% TC peak；`q_b_proj` 为 83.2%。其余四个常规形状约为 75%–77%。`dense_down_proj` 和 `dense_gate_up_proj` 在最大 M 端略有回落，但仅凭单次汇总不能区分 cuBLAS 算法切换、wave/尾部效应或功耗时钟变化。"
+      },
+      {
+        "id": "platform_table_block",
+        "type": "table",
+        "tableId": "platform_table"
+      },
+      {
+        "id": "roof_finding",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## 高 `%BW` 与低 `%TCpeak` 才支持“主要受带宽限制”\n\n在 M≤16，`dense_gate_up_proj` 的平均 `%BW` 为 77.8%，`in_proj_qkvgfab` 为 68.6%，`o_proj` 为 67.8%，`dense_down_proj` 为 61.8%；它们远高于同区间的 `%TCpeak`，因此 memory roof 能较好解释性能。`fused_qkv_a_proj` 平均只有 45.1%，说明带宽和固定开销并存。`q_b_proj` 为 16.4%，`f_b_proj` 仅 1.3%，两者离 memory roof 也很远，主要问题不是“HBM 已经打满”。"
+      },
+      {
+        "id": "roof_chart_block",
+        "type": "chart",
+        "chartId": "low_m_bw"
+      },
+      {
+        "id": "f_b_analysis",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## K=128 同时压低 AI、流水深度与并行度\n\n`f_b_proj` 的 N=1536、K=128。K 方向很短，使每个输出 tile 只执行很少的 MMA reduction，难以用计算覆盖数据搬运、同步、epilogue 和 kernel setup；N 方向也只提供有限数量的输出 tile，小 M 时整个 GEMM 无法生成足够多 CTA 填满 B300 的 SM。数据中的 3.7–5.0 μs 小矩阵耗时几乎不随 M 变化，正是固定延迟占主导的信号。随着 M 增大，并行度和传输规模改善，`%BW` 从约 1% 上升到 73.4%，但由于 AI 上限低，`%TCpeak` 最终仍只有 30.8%。"
+      },
+      {
+        "id": "skinny_kernel",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## M≤16 时应优化延迟路径，而不是追逐 Tensor Core 峰值\n\nM 很小时，公式中的权重项 NK 占据字节分母，因而 AI 近似 M；同时只有少量输出行，CTA 数量和每 CTA 的有效工作都不足。实测 M≤16 的 `%TCpeak` 为 0%–4.4%，说明 Tensor Core throughput 不是此时的关键资源。vLLM 的 skinny CUDA Core kernel 直接围绕少量输出行组织 FMA，绕过 cuBLAS/TMA/Tensor Core 路径的较重 setup，减少 tile 填充、同步和调度成本；这解释了为何较低的理论计算峰值反而能获得更低 decode 延迟。"
+      },
+      {
+        "id": "definitions",
+        "type": "markdown",
+        "sourceId": "benchmark_program",
+        "body": "## 测量口径与判定方法\n\n本实验是 cuBLAS BF16 输入、FP32 累加、BF16 输出。采用 B300 SXM dense BF16 Tensor Core 峰值 2250 TFLOPS 与 8000 GB/s HBM3e 带宽，机器平衡点为 281.25 FLOP/byte。`%TCpeak = 实测 TFLOPS / 2250`；`%BW = 有效 GB/s / 8000 = 实测 TFLOPS / memory roof`。当 AI 低于平衡点且 `%BW` 较高时，才把形状称为主要 memory-bound；如果两个达成率都低，则需要考虑固定延迟、并行度、tile 效率与流水深度。"
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## 汇总方法\n\n数据包含七个形状，每个形状九个 M，共 63 行，行数和字段均完整。平台统计对 M=4096、16384、65536 三点取均值和范围；总体拐点统计排除了机制明显不同的 `f_b_proj`，对其余六个形状按同一 M 等权平均。小 M 带宽比较对 M=1、8、16 的 `%BW` 取均值。表内百分比与 2250 TFLOPS、8000 GB/s 两个分母复算一致。"
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "sourceId": "benchmark_output",
+        "body": "## 限制与稳健性\n\n这里的 GB/s 是按 A、W、D 各搬运一次计算的**有效带宽**，并非 profiler 直接测得的 HBM transaction；重复使用同一缓冲还可能受到 L2 cache 影响。因此高 `%BW` 支持 memory-side 限制，但不能替代 Nsight Compute 的 DRAM/L2 指标。附件只有每个点的一次平均值，没有方差、时钟和功耗记录，所以平台端的小幅回落不能被解释成确定的硬件原因。另外，本表只测了 cuBLAS；它解释了 skinny kernel 的动机，但没有直接证明 skinny kernel 的加速比。"
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## 建议的下一步验证\n\n- 对 M=8、256、4096 各选一个代表形状，用 Nsight Compute 检查 DRAM/L2 throughput、Tensor Core 活跃度、SM/warp 活跃度与 launch/occupancy，区分 HBM、cache 和低并行度。\n- 对 `f_b_proj` 单独比较 cuBLAS 与 skinny kernel 的 kernel duration，至少重复多轮并报告中位数及分位数。\n- 若要确认最大 M 端的轻微回落，固定 GPU clock，随机化形状执行顺序，并记录功耗与温度。"
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## 仍需进一步回答的问题\n\n最关键的未决问题是：小 M 的高有效 `%BW` 中有多少来自 HBM、多少来自 L2 命中？这会影响对“显存带宽限制”的严格表述。第二个问题是 skinny kernel 的收益主要来自更低 launch/setup，还是来自更适合小 M 的访存与 CTA 映射；需要把两种 kernel 放在同一输入、时钟和重复次数下直接比较。"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-30T00:00:00Z",
+    "status": "ready",
+    "datasets": {
+      "trend_summary": [
+        {"m": 1, "m_label": "1", "series": "六个常规 K 形状平均", "tflops": 4.1, "tc_peak_pct": 0.2},
+        {"m": 8, "m_label": "8", "series": "六个常规 K 形状平均", "tflops": 37.5, "tc_peak_pct": 1.7},
+        {"m": 16, "m_label": "16", "series": "六个常规 K 形状平均", "tflops": 74.6, "tc_peak_pct": 3.3},
+        {"m": 64, "m_label": "64", "series": "六个常规 K 形状平均", "tflops": 274.1, "tc_peak_pct": 12.2},
+        {"m": 256, "m_label": "256", "series": "六个常规 K 形状平均", "tflops": 881.2, "tc_peak_pct": 39.2},
+        {"m": 1024, "m_label": "1024", "series": "六个常规 K 形状平均", "tflops": 1401.9, "tc_peak_pct": 62.3},
+        {"m": 4096, "m_label": "4096", "series": "六个常规 K 形状平均", "tflops": 1761.1, "tc_peak_pct": 78.3},
+        {"m": 16384, "m_label": "16384", "series": "六个常规 K 形状平均", "tflops": 1780.8, "tc_peak_pct": 79.1},
+        {"m": 65536, "m_label": "65536", "series": "六个常规 K 形状平均", "tflops": 1790.2, "tc_peak_pct": 79.6},
+        {"m": 1, "m_label": "1", "series": "f_b_proj (K=128)", "tflops": 0.1, "tc_peak_pct": 0.0},
+        {"m": 8, "m_label": "8", "series": "f_b_proj (K=128)", "tflops": 0.8, "tc_peak_pct": 0.0},
+        {"m": 16, "m_label": "16", "series": "f_b_proj (K=128)", "tflops": 1.5, "tc_peak_pct": 0.1},
+        {"m": 64, "m_label": "64", "series": "f_b_proj (K=128)", "tflops": 6.5, "tc_peak_pct": 0.3},
+        {"m": 256, "m_label": "256", "series": "f_b_proj (K=128)", "tflops": 24.7, "tc_peak_pct": 1.1},
+        {"m": 1024, "m_label": "1024", "series": "f_b_proj (K=128)", "tflops": 108.6, "tc_peak_pct": 4.8},
+        {"m": 4096, "m_label": "4096", "series": "f_b_proj (K=128)", "tflops": 325.0, "tc_peak_pct": 14.4},
+        {"m": 16384, "m_label": "16384", "series": "f_b_proj (K=128)", "tflops": 571.4, "tc_peak_pct": 25.4},
+        {"m": 65536, "m_label": "65536", "series": "f_b_proj (K=128)", "tflops": 692.1, "tc_peak_pct": 30.8}
+      ],
+      "low_m_roof": [
+        {"layer": "dense_gate_up_proj", "bw_mean_pct": 77.83, "bw_min_pct": 75.8, "bw_max_pct": 79.8, "tc_max_pct": 4.4},
+        {"layer": "in_proj_qkvgfab", "bw_mean_pct": 68.60, "bw_min_pct": 66.1, "bw_max_pct": 71.9, "tc_max_pct": 3.8},
+        {"layer": "o_proj", "bw_mean_pct": 67.77, "bw_min_pct": 57.4, "bw_max_pct": 74.1, "tc_max_pct": 4.0},
+        {"layer": "dense_down_proj", "bw_mean_pct": 61.77, "bw_min_pct": 58.9, "bw_max_pct": 63.9, "tc_max_pct": 3.5},
+        {"layer": "fused_qkv_a_proj", "bw_mean_pct": 45.10, "bw_min_pct": 39.8, "bw_max_pct": 48.0, "tc_max_pct": 2.7},
+        {"layer": "q_b_proj", "bw_mean_pct": 16.43, "bw_min_pct": 9.5, "bw_max_pct": 24.7, "tc_max_pct": 1.4},
+        {"layer": "f_b_proj", "bw_mean_pct": 1.33, "bw_min_pct": 1.3, "bw_max_pct": 1.4, "tc_max_pct": 0.1}
+      ],
+      "platform_summary": [
+        {"layer": "o_proj", "tf_avg": 1958.70, "tf_range": "1885.2–2013.7", "tc_avg_pct": 87.07, "tc_range": "83.8%–89.5%", "bw_avg_pct": 21.90},
+        {"layer": "q_b_proj", "tf_avg": 1873.13, "tf_range": "1755.6–1978.1", "tc_avg_pct": 83.23, "tc_range": "78.0%–87.9%", "bw_avg_pct": 27.80},
+        {"layer": "in_proj_qkvgfab", "tf_avg": 1721.20, "tf_range": "1684.9–1761.5", "tc_avg_pct": 76.50, "tc_range": "74.9%–78.3%", "bw_avg_pct": 8.70},
+        {"layer": "fused_qkv_a_proj", "tf_avg": 1716.90, "tf_range": "1638.3–1761.9", "tc_avg_pct": 76.30, "tc_range": "72.8%–78.3%", "bw_avg_pct": 15.37},
+        {"layer": "dense_down_proj", "tf_avg": 1703.80, "tf_range": "1626.9–1839.7", "tc_avg_pct": 75.73, "tc_range": "72.3%–81.8%", "bw_avg_pct": 7.90},
+        {"layer": "dense_gate_up_proj", "tf_avg": 1690.47, "tf_range": "1653.6–1730.7", "tc_avg_pct": 75.13, "tc_range": "73.5%–76.9%", "bw_avg_pct": 6.50},
+        {"layer": "f_b_proj", "tf_avg": 529.50, "tf_range": "325.0–692.1", "tc_avg_pct": 23.53, "tc_range": "14.4%–30.8%", "bw_avg_pct": 56.57}
+      ]
+    },
+    "accessIssues": []
+  },
+  "sources": []
+}

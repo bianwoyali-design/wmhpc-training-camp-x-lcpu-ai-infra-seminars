@@ -397,9 +397,9 @@ assignment01 Bonus 中的 naive matmul。由于该实现使用 fp32，只比较�
 | 实现 | TFLOPS | 对 cuBLAS 达成率 | 一句话：时间主要花在哪 |
 |---|---|---|---|
 | naive（assignment01，fp32） | | | |
-| 4.1 tiled | | | |
-| 4.2 TMA | | | |
-| 4.3 pipeline（S=3） | | | |
+| 4.1 tiled |29.7 TFLOPS|(cuBLAS 1057.2, 达成率 3%)|staging、同步、MMA、等待完全串行，没有重叠, 每个 K tile 都有 __syncthreads、commit 和 mbarrier wait|
+| 4.2 TMA |577.0 TFLOPS|(cuBLAS 1767.2, 达成率 33%)|单缓冲造成的 TMA→MMA 串行|
+| 4.3 pipeline（S=3） |602.4 TFLOPS |(cuBLAS 1767.0, 达成率 34%) |smem大小不够导致pipline和SM多block驻留并发的tradeoff|
 | cuBLAS | | 100% | |
 
 
@@ -443,6 +443,19 @@ make run/m4_gemm/02_tma
 
 使用 Nsight Compute 辅助分析，观察 4.1 中 SM 时间主要消耗在哪些部分。
 
+下列工作不再由普通 CUDA 线程逐元素完成：
+- global load 的地址生成与事务组织。
+- 逐元素 shared-memory store。
+- 线程内 staging 循环及循环控制。
+- 软件计算 swz128 地址。
+- 由全部 128 个线程协作完成搬运。
+- generic → async proxy 所需的 fence.proxy.async。
+现在只由一个线程发射两条 TMA，硬件根据 tensor map 自动完成全局地址遍历、成块搬运、128B swizzle 和 shared-memory 写入，并通过 full mbarrier 报告完成。
+仍然存在的工作包括：
+- TMA 发射和 full mbarrier 等待。
+- tcgen05 MMA、commit 和 empty mbarrier。
+- TMEM epilogue。
+- 单缓冲造成的 TMA→MMA 串行；4.3 pipeline 才会进一步重叠二者。
 
 ::: {.capstone title="prob 4.3(FROM-SCRATCH):多级流水" file=cuda/m4_gemm/03_pipeline.cu}
 
@@ -480,23 +493,32 @@ cd m4_gemm && ./sweep_stages.sh
 
    | 形状 | S=2 | S=3 | S=4 | S=6 |
    |---|---|---|---|---|
-   | 4096³ | | | | |
-   | 256 × 4096 × 16384 | | | | |
+   | 4096³ |584.3 TFLOPS|601.8 TFLOPS|509.1 TFLOPS|308.3 TFLOPS|
+   | 256 × 4096 × 16384 |233.0 TFLOPS|300.8 TFLOPS|310.5 TFLOPS|305.1 TFLOPS|
 
    比较两个形状对 `STAGES` 的敏感程度，并结合 shared memory 用量、
    每个 SM 可同时驻留的 block 数以及 block 间并发能够隐藏的延迟进行解释。
+
+   大 grid 本身能够利用多 block/SM 隐藏延迟，所以过深 pipeline 造成的 occupancy 损失更突出；小 grid、长 K 缺少 block 间并发，因而更依赖块内多级流水，最优 stage 数更深，并且在 S=4 左右趋于饱和。
 
 3. 任选一个 `STAGES`，画出稳态阶段各 stage 中 TMA 与 mma 的流水时空图。
 
 4. 回答：
 
    (a) 从 4.1 到 4.3，主要瓶颈发生了哪些变化？
-
+   4.1：瓶颈主要在软件 staging 和同步，4.2：瓶颈移动到单缓冲串行依赖，4.3：减少暴露的 TMA 延迟，瓶颈进一步移向 MMA/TMA 吞吐和资源并发
    (b) 梯子表中每一级优化分别减少了哪部分开销？
-
+  | 优化 | 主要减少的开销 | 没有减少的部分 |
+|---|---|---|
+| naive → 4.1 tiled | 通过 tiling 增加 A/B 数据复用；使用 Tensor Core 替代大量普通标量 FMA；降低每 FLOP 对应的 global-memory 流量 | 软件 staging、swizzle、同步仍很重 |
+| 4.1 → 4.2 TMA | 普通线程的 global 地址生成、事务组织、逐元素 shared store、staging 循环、软件 swizzle；不再需要 generic→async proxy fence | global 搬运字节数没有消失；TMA 与 MMA仍串行 |
+| 4.2 → 4.3 pipeline | 不减少 TMA 字节数或 MMA 数量，而是通过重叠隐藏原本暴露在关键路径上的 TMA/full-wait 延迟 | 增加 shared-memory 容量；仍有 barrier、MMA commit、epilogue |
    (c) 如果继续增大 tile 或增加 stage 数，shared memory 与 TMEM
    哪一个会先成为容量限制？结合 3.4(c) 的结果说明。
-
+   增加 stage：SMEM 增长，TMEM不变，SMEM必然先限制。
+   扩大 tile：SMEM和TMEM都可能增长；
+   但在当前S=3及其以上的设计中，SMEM已经明显压低block/SM，
+   因此通常先成为实际限制。
 :::
 
 
@@ -566,9 +588,105 @@ make bin/m4_gemm/05_thin_gemm
 (d) 根据上述结果解释 vLLM 在 $M \le 16$ 时选择 skinny CUDA Core
 kernel 的原因。
 
+结论很清楚：六个常规形状在 M=4096–65536 进入平台，平均约达到 Tensor Core 峰值的 79%；从 M=1024 开始下滑，M≤256 明显塌陷。f_b_proj 因 K=128 属于另一种机制，需要单独讨论。
+
+(a) 性能随 M 的趋势
+
+随着 M 增大，TFLOPS 快速上升；原因是 arithmetic intensity 和可并行 CTA 数量增加，同时 kernel 启动、调度及 Tensor Core setup 等固定成本被摊薄。
+从大 M 向小 M 看：
+- M≥4096：六个常规形状进入相对稳定平台。
+- M=1024：开始偏离平台，六层平均 %TCpeak 从约 79% 降至 62.3%，属于过渡区。
+- M=256：平均只剩 39.2%，已经明显塌陷。
+- M=64：平均 12.2%。
+- M=16：平均仅 3.3%。
+六个常规形状在 M≥4096 的平台数据为：
+
+| 形状 | 平台 TFLOPS 范围 | 平均 `%TCpeak` |
+|---|---|---|
+| `q_b_proj` | 1755.6–1978.1 | 83.2% |
+| `o_proj` | 1885.2–2013.7 | 87.1% |
+| `fused_qkv_a_proj` | 1638.3–1761.9 | 76.3% |
+| `in_proj_qkvgfab` | 1684.9–1761.5 | 76.5% |
+| `dense_down_proj` | 1626.9–1839.7 | 75.7% |
+| `dense_gate_up_proj` | 1653.6–1730.7 | 75.1% |
+
+
+因此可以概括为：平台约 1.63–2.01 PFLOPS，达成率约 72%–90%，六层总体平均约 79%。
+f_b_proj 没有进入相同的 compute 平台：其 TFLOPS 从 M=4096 的 325 继续增长到 M=65536 的 692，%TCpeak 也只有 14.4%–30.8%。
+
+(b) compute roof 与 memory roof 的比较
+
+在理论 roofline 分类上，M≤256 时所有形状的 AI 都低于机器平衡点 281.25 FLOP/byte，因此 memory roof 都低于 compute roof。但是否真的主要受 HBM 带宽限制，还要看 %BW 是否足够高。
+
+| 形状 | M≤16 的 `%TCpeak` | M≤16 的 `%BW` | 判断 |
+|---|---|---|---|
+| `dense_gate_up_proj` | 0.3%–4.4% | 75.8%–79.8% | 明显带宽侧限制 |
+| `in_proj_qkvgfab` | 0.2%–3.8% | 66.1%–71.9% | 主要带宽侧限制 |
+| `o_proj` | 0.2%–4.0% | 57.4%–74.1% | 主要带宽侧限制 |
+| `dense_down_proj` | 0.2%–3.5% | 58.9%–63.9% | 主要带宽侧限制 |
+| `fused_qkv_a_proj` | 0.1%–2.7% | 39.8%–48.0% | 带宽与固定开销混合 |
+| `q_b_proj` | 0%–1.4% | 9.5%–24.7% | 两个 roof 都低，非纯带宽限制 |
+| `f_b_proj` | 0%–0.1% | 1.3%–1.4% | 形状、并行度和固定延迟主导 |
+
+
+所以，最明确受显存带宽侧限制的是：
+- dense_gate_up_proj
+- in_proj_qkvgfab
+- o_proj
+- dense_down_proj
+fused_qkv_a_proj 有明显带宽影响，但并未充分接近 memory roof。q_b_proj 和小 M 的 f_b_proj 连带宽 roof 都离得很远，不能简单解释为“HBM 已打满”。
+需要注意：这里的 GB/s 是按 A、W、D 各搬运一次计算的有效带宽，不是 profiler 直接测得的 HBM transaction；重复访问还可能命中 L2。因此严格确认 HBM 瓶颈仍需 Nsight Compute。
+(c) f_b_proj 为什么两个 roof 都低
+
+f_b_proj 的形状为 N=1536, K=128。它有三个相互叠加的问题：
+
+1. 理论 AI 上限很低
+
+   当 $M \to \infty$ 时：
+$$
+AI_{\max}
+= \frac{NK}{N+K}
+= \frac{1536 \times 128}{1536 + 128}
+\approx 118.15
+$$
+   这远低于 B300 SXM 的机器平衡点 281.25，因此它无论 M 多大都无法转成 compute-bound。
+
+2. K=128 的 reduction 太短
+   每个输出 tile 只需要很少的 MMA K 迭代，Tensor Core 计算时间不足以覆盖数据搬运、同步、调度和 epilogue，pipeline 也难以充分展开。
+
+3. 小 M 时并行度和传输规模都太小
+   N=1536 能提供的 N tile 数有限，小 M 又只能提供一两个 M tile，无法生成足够 CTA 填满 B300 的 SM。其小矩阵耗时长期维持在约 4 μs，说明固定延迟占主导；同时数据量又不足以让 HBM 达到峰值，所以 %TCpeak 和 %BW 都低。
+
+
+随着 M 增大，并行度改善，%BW 最终升到 73.4%；但受 AI 上限限制，%TCpeak 在最大 M 也只有 30.8%。
+
+(d) 为什么 M≤16 选择 skinny CUDA Core kernel
+
+  M≤16 时，所有形状的 %TCpeak 只有 0%–4.4%，而同一层从 M=1 增长到 M=16 时，kernel 时间通常几乎不变。这说明运行时间主要不是 Tensor Core 计算，而是：
+- kernel launch 和 cuBLAS dispatch；
+- Tensor Core/TMA/tile setup；
+- 同步和 epilogue；
+- CTA 数量不足；
+- tile 填充和尾部浪费；
+- 短 kernel 无法隐藏访存延迟。
+  skinny CUDA Core kernel 直接针对少量输出行安排 FMA，绕过较重的 Tensor Core 数据供给与调度路径。虽然 CUDA Core 的理论峰值较低，但在这个区间真正重要的是固定延迟而不是峰值 FLOPS，因此端到端 decode 延迟反而更低。
+  本次计算使用 B300 SXM dense BF16 2250 TFLOPS 和 8000 GB/s；官方资料给出的 B300 SXM 带宽为最高 8 TB/s，B300 SXM 规格，BF16 dense 为官方 sparse 数值的一半，HGX B300 规格。
+
 `in_proj_qkvgfab` 对应 KDA 的输入投影。完成团队题 C1/C2 的同学可以
 使用这一行的实验结果作为后续分析的参考。
 
+```
+layer                    M      N      K        us    TFLOPS      GB/s      AI  %TCpeak      %BW
+in_proj_qkvgfab          1   6288   7168      17.1       5.3    5285.6     1.0     0.2%    66.1%
+in_proj_qkvgfab          8   6288   7168      15.7      45.9    5750.4     8.0     2.0%    71.9%
+in_proj_qkvgfab         16   6288   7168      16.7      86.3    5421.3    15.9     3.8%    67.8%
+in_proj_qkvgfab         64   6288   7168      15.1     381.7    6078.0    62.8    17.0%    76.0%
+in_proj_qkvgfab        256   6288   7168      22.7    1015.6    4270.3   237.8    45.1%    53.4%
+in_proj_qkvgfab       1024   6288   7168      61.9    1491.4    1901.7   784.2    66.3%    23.8%
+in_proj_qkvgfab       4096   6288   7168     215.0    1717.2     931.9  1842.7    76.3%    11.6%
+in_proj_qkvgfab      16384   6288   7168     838.4    1761.5     633.4  2781.0    78.3%     7.9%
+in_proj_qkvgfab      65536   6288   7168    3506.2    1684.9     528.7  3186.7    74.9%     6.6%
+```
 
 ::: lookback
 
@@ -611,17 +729,28 @@ uv run python kernels/quant_outlier.py
 
 | 采样点 $x\approx$ | 0.5 | 0.1 | 0.01 | 0.005 | 3000 |
 |---|---|---|---|---|---|
-| 相对误差 | | | | | |
+| 相对误差 | 4.611e-02 | 4.634e-02 | 3.085e-01 | 1.000e+00 | 0.000e+00 |
 
 根据实验结果回答：
 
 (a) 去掉 outlier 后重新量化，$x\approx0.5$ 处的误差变化多少倍？
 
+149.42x
+
 (b) 找出输入被量化为 0 的阈值，并写出该阈值与 scale 的关系式。
+
+$$
+x_{threshold} = scale * 2 ^ {-10} \approx 0.006539
+$$
 
 (c) 改用 1×128 的 per-block scale 后，包含 outlier 的 block 与不包含
 outlier 的 block 分别有什么变化？
 
+不含 outlier 的 block 使用较小的 scale，普通数值保持较高精度。
+
+含 outlier 的 block 仍被 3000 控制，较小元素误差变大，小于约 0.006539 的元素会量化成 0。
+
+其他 block 不受 outlier 影响，所以 per-block scaling 把 outlier 的影响限制在了一个 block 内。
 
 ### 5.2 {.prob type=DERIVE file=kernels/block_scale_sim.py}
 
@@ -649,6 +778,24 @@ bit-exact（因为分段会改变浮点加法的分组）。然后回答:
 
 (a) 用两行代数式分别写出 row/column scale 为什么可以在整个
 点积外乘回，而 K-block scale 为什么必须逐段乘回。
+
+设归一化后的值为 $qA$、$qB$，且代码计算 $C=AB^T$。
+
+Row/column scale 在整个 K 维不变，因此可以提出求和：
+
+$$
+C_{ij}=\sum_k(s^A_iqA_{ik})(s^B_jqB_{jk})
+=s^A_i s^B_j\sum_k qA_{ik}qB_{jk}.
+$$
+
+K-block scale 随分段 $g$ 改变，只能对每段分别乘回：
+
+$$
+C_{ij}=\sum_g\sum_{k\in K_g}(s^A_{ig}qA_{ik})(s^B_{jg}qB_{jk})
+=\sum_g s^A_{ig}s^B_{jg}\left(\sum_{k\in K_g}qA_{ik}qB_{jk}\right).
+$$
+
+因为 $s^A_{ig}s^B_{jg}$ 随 $g$ 变化，所以不存在一个公共 scale 能从整个 K 求和中提出。
 
 (b) [NVIDIA CUTLASS 的 Blackwell SM100 GEMM 说明](https://docs.nvidia.com/cutlass/latest/media/docs/cpp/blackwell_functionality.html)
 把 A 的
@@ -713,7 +860,19 @@ make run/m5_lowprec/test_fp4_gemm
 报告：
 
 - ceiling probe 的 GB/s；
+```
+./bin/m5_lowprec/03c_ceiling_probe
+M=4096   K=7168   probe    22.59 us    3330 GB/s
+M=16384  K=4096   probe    45.04 us    3818 GB/s
+M=16384  K=8192   probe    84.30 us    4080 GB/s
+```
 - quant kernel 的 GB/s；
+```
+./bin/m5_lowprec/03b_nvfp4_quant
+M=128   K=1024   PASS(bad=0)      6.16 us      55 GB/s
+M=200   K=4096   PASS(bad=0)      6.16 us     341 GB/s
+M=4096  K=7168   PASS(bad=0)     65.56 us    1148 GB/s
+```
 - 两者的比值。
 
 结合 Nsight Compute 判断 quant kernel 距离自己的访存上限还有多远，

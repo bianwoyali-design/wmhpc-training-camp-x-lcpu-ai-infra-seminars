@@ -14,6 +14,13 @@ NVCC  ?= nvcc
 ARCH  ?= 100f
 FLAGS ?= -O2 -std=c++17 -I. --expt-relaxed-constexpr
 
+# clangd 使用 Clang 风格的 CUDA 参数。compile_commands.json 只供编辑器
+# 解析，不直接拿来调用 nvcc；sm_100 会启用 cooperative_groups 的 cluster
+# API，同时 CCCL 路径用于解析 CUDA 13 的 <cuda/...> 头文件。
+CLANGD_CUDA_PATH ?= /usr/local/cuda
+CLANGD_CUDA_ARCH ?= sm_100
+CLANGD_CUDA_COMPILER ?= /usr/local/cuda/bin/nvcc
+
 # 问题 4.3 的流水级数:STAGES=4 make -B bin/m4_gemm/03_pipeline
 # -B 不能省——只改 -D 不改源文件,make 会认为目标是新鲜的。
 ifdef STAGES
@@ -45,7 +52,28 @@ ptx/%: %.cu common.h
 	$(NVCC) $(FLAGS) $(GENCODE) -ptx -o $*.ptx $<
 	@echo "已生成 $*.ptx"
 
-clean:
-	rm -rf bin */*.ptx
+compile_commands.json:
+	@tmp=$@.tmp; \
+	{ \
+		printf '[\n'; \
+		first=1; \
+		find . -type f -name '*.cu' -not -path './bin/*' -not -path './.git/*' -not -path './.vscode/*' | sort | while IFS= read -r src; do \
+			[ "$$first" -eq 1 ] || printf ',\n'; \
+			first=0; \
+			printf '  {\n'; \
+			printf '    "directory": "%s",\n' "$(CURDIR)"; \
+			printf '    "command": "%s -std=c++17 -I. -isystem %s/include/cccl --cuda-path=%s --cuda-gpu-arch=%s -D_CG_CLUSTER_INTRINSICS_AVAILABLE -c %s -o /dev/null",\n' "$(CLANGD_CUDA_COMPILER)" "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_PATH)" "$(CLANGD_CUDA_ARCH)" "$$src"; \
+			printf '    "file": "%s"\n' "$$src"; \
+			printf '  }'; \
+		done; \
+		printf '\n]\n'; \
+	} > "$$tmp"; \
+	mv "$$tmp" $@; \
+	echo "已生成 $@"
 
-.PHONY: run/% ptx/% clean
+clean:
+	rm -rf bin */*.ptx compile_commands.json
+
+.PHONY: run/% ptx/% clean clangd-db
+
+clangd-db: compile_commands.json

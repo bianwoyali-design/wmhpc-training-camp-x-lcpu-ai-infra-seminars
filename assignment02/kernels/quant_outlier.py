@@ -20,21 +20,42 @@ def build_tensor(n: int = 10000, outlier: float = 3000.0) -> torch.Tensor:
     return torch.cat([x, torch.tensor([outlier])])
 
 
+def build_tensor_without_outlier(n: int = 10000) -> torch.Tensor:
+    g = torch.Generator().manual_seed(0)
+    x = torch.rand(n, generator=g) * 2 - 1
+    return x
+
+
 def quant_dequant_per_tensor(x: torch.Tensor) -> torch.Tensor:
     """per-tensor E4M3 量化再反量化。
 
     TODO: 实现。步骤:算 scale = amax / 448;除 scale 后 cast 到
     torch.float8_e4m3fn;cast 回 float 再乘 scale。
     """
-    raise NotImplementedError
+    amax = x.abs().amax()
+    scale = amax / E4M3_MAX
+    x_q = (x / scale).to(torch.float8_e4m3fn)
+    y = x_q.to(torch.float) * scale
+    return y
 
+def quant_dequant_per_block_1x128(x: torch.Tensor) -> torch.Tensor:
+    block_size = 128
+    result_blocks = []
+    for start in range(0, x.numel(), block_size):
+        block = x[start : start + block_size]
+        block_y = quant_dequant_per_tensor(block)
+        result_blocks.append(block_y)
+    return torch.cat(result_blocks)
 
 def rel_err_at(x: torch.Tensor, y: torch.Tensor, value: float) -> float:
     """取 x 中最接近 value 的元素,返回该点的相对误差。
 
     TODO: 实现(表格的每一格都从这里来)。
     """
-    raise NotImplementedError
+    idx = (x - value).abs().argmin()
+    x_val = x[idx]
+    y_val = y[idx]
+    return ((y_val - x_val).abs() / x_val.abs()).item()
 
 
 def main() -> None:
@@ -44,8 +65,27 @@ def main() -> None:
     for v in (0.5, 0.1, 0.01, 0.005, 3000.0):
         print(f"  x≈{v:<8} rel_err={rel_err_at(x, y, v):.3e}")
     # (a) 去掉 outlier 重新量化,对比 0.5 处的误差
+    x_without_outlier = build_tensor_without_outlier()
+    y_without_outlier = quant_dequant_per_tensor(x_without_outlier)
+    print("不含 outlier:")
+    for v in (0.5, 0.1, 0.01, 0.005, 3000.0):
+        print(f"  x≈{v:<8} rel_err={rel_err_at(x_without_outlier, y_without_outlier, v):.3e}")
     # (b) 找出被量化成 0 的阈值,写出它与 scale 的关系式
     # (c) 换 1x128 的 per-block scale,对比含/不含 outlier 的 block
+    y_block = quant_dequant_per_block_1x128(x)
+    print("1x128 的 per-block scale,对比含/不含 outlier 的 block:")
+    normal_x = x[:128]
+    normal_y = y_block[:128]
+    outlier_x = x[78 * 128:]
+    outlier_y = y_block[78 * 128:]
+    for v in (0.5, 0.1, 0.01, 0.005, 3000.0):
+        print(f"  x≈{v:<8} rel_err={rel_err_at(x, y_block, v):.3e}")
+
+    for v in (0.5, 0.1, 0.01, 0.005, 3000.0):
+        print(f"  x≈{v:<8} rel_err={rel_err_at(normal_x, normal_y, v):.3e}")
+
+    for v in (0.5, 0.1, 0.01, 0.005, 3000.0):
+        print(f"  x≈{v:<8} rel_err={rel_err_at(outlier_x, outlier_y, v):.3e}")
     # 这三问自己补代码,结果写进报告。
 
 

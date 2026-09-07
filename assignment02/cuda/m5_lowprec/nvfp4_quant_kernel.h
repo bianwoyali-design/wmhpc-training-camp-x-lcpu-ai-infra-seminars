@@ -19,22 +19,63 @@
 // 组织建议:16 元素 = 32 byte,一个线程恰好负责一个组,天然免掉组内
 // 线程协作;quant 没有行间依赖,grid 怎么铺完全自由。
 #pragma once
+#include "nvfp4_common.h"
 #include <cstdint>
 #include <cuda_bf16.h>
 #include <cuda_fp4.h>
 #include <cuda_fp8.h>
-#include "nvfp4_common.h"
 
 template <int BLOCK>
-__global__ void nvfp4_quant_kernel(const __nv_bfloat16* __restrict__ in,
-                                   uint8_t* __restrict__ dataOut,
-                                   uint8_t* __restrict__ sfOut, int M, int K) {
-    // TODO: 实现。
+__global__ void nvfp4_quant_kernel(const __nv_bfloat16 *__restrict__ in,
+                                   uint8_t *__restrict__ dataOut,
+                                   uint8_t *__restrict__ sfOut, int M, int K) {
+  const int groups_per_row = K / NVFP4_GROUP;
+  const int num_groups = M * groups_per_row;
+
+  const int group_ID = blockIdx.x * BLOCK + threadIdx.x;
+  if (group_ID >= num_groups) {
+    return;
+  }
+
+  const int row = group_ID / groups_per_row;
+  const int k_group = group_ID % groups_per_row;
+
+  const int k0 = k_group * NVFP4_GROUP;
+  const int in_base = row * K + k0;
+
+  float amax = 0.0f;
+#pragma unroll
+  for (int i = 0; i < NVFP4_GROUP; ++i) {
+    const float v = __bfloat162float(in[in_base + i]);
+    amax = std::fmax(amax, std::fabs(v));
+  }
+
+  const __nv_fp8_e4m3 sf8(amax / 6.0f);
+  const float sf = static_cast<float>(sf8);
+  const float inv = sf != 0 ? 1.0f / sf : 0.0f;
+
+  const int ktiles = nvfp4_num_ktiles(K);
+  sfOut[sf_swizzled_offset(row, k_group, ktiles)] = sf8.__x;
+
+  const int out_base = row * (K / 2) + k_group * (NVFP4_GROUP / 2);
+
+#pragma unroll
+  for (int i = 0; i < NVFP4_GROUP; i += 2) {
+    const float x = __bfloat162float(in[in_base + i]) * inv;
+    const float y = __bfloat162float(in[in_base + i + 1]) * inv;
+    const __nv_fp4x2_e2m1 q(make_float2(x, y));
+    dataOut[out_base + i / 2] = q.__x;
+  }
 }
 
 // 判测和 5.4 会按这个签名调用;grid 大小你自己定,写在这里。
-inline void launch_nvfp4_quant(const __nv_bfloat16* in, uint8_t* dataOut,
-                               uint8_t* sfOut, int M, int K, int sms) {
-    // TODO: 选择 grid/block 并启动 nvfp4_quant_kernel。
-    (void)in; (void)dataOut; (void)sfOut; (void)M; (void)K; (void)sms;
+inline void launch_nvfp4_quant(const __nv_bfloat16 *in, uint8_t *dataOut,
+                               uint8_t *sfOut, int M, int K, int sms) {
+  constexpr int BLOCK = 256;
+
+  const int groups_per_row = K / NVFP4_GROUP;
+  const int num_groups = M * groups_per_row;
+  const int grid = (num_groups + BLOCK - 1) / BLOCK;
+
+  nvfp4_quant_kernel<BLOCK><<<grid, BLOCK>>>(in, dataOut, sfOut, M, K);
 }
