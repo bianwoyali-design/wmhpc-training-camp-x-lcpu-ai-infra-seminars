@@ -954,6 +954,508 @@ make run/m5_lowprec/04_fused_rms_nvfp4
 
 本题不设置性能门槛。实现首先需要保证正确，评分重点放在实验设计和性能归因。
 
+# 5.4 融合 RMSNorm + NVFP4 Quant 性能分析报告
+
+## 1. 实验目标
+
+本题实现融合的 RMSNorm + NVFP4 quant kernel。计算语义为
+
+$$
+rnorm=\frac{1}{\sqrt{\frac{1}{K}\sum_{i=0}^{K-1}x_i^2+\epsilon}},
+$$
+
+$$
+y_i=x_i\cdot rnorm\cdot w_i,
+$$
+
+随后按照每 16 个元素一组，将 $y$ 直接量化为 NVFP4。与两步实现不同，融合 kernel 不将 RMSNorm 的结果以 bf16 中间张量写回显存。
+
+两步实现的理论访存量约为
+
+$$
+6.56\ \mathrm{B/elem},
+$$
+
+融合后约为
+
+$$
+2.56\ \mathrm{B/elem},
+$$
+
+因此，如果运行时间完全由显存传输量决定，理想加速比为
+
+$$
+\frac{6.56}{2.56}\approx 2.56\times.
+$$
+
+实验的主要目的并不是验证融合是否正确，而是分析为什么实际性能提升明显低于这一理论上限。
+
+---
+
+## 2. Kernel 实现
+
+融合 kernel 采用 block-per-row 的结构，并让不同 block 独立处理不同 row。
+
+RMSNorm 阶段中，每个线程使用 `float4` 一次读取连续 8 个 bf16，即一次进行 16 B 的向量化加载。线程首先累积自己的平方和，然后使用 warp shuffle 完成 warp 内归约，各 warp 的结果写入 shared memory，再由第一个 warp 完成 block 级归约并计算 `rnorm`。
+
+计算出 `rnorm` 后，同一 block 继续对该 row 进行 NVFP4 quant。每个线程负责若干个 16-element group。对每组数据，使用两个 `float4` 分别加载 16 个 bf16 输入和对应的 weight，计算
+
+$$
+y_i=x_i\cdot rnorm\cdot w_i,
+$$
+
+并将 16 个 FP32 中间结果暂存在寄存器中，同时计算该组的 `amax`。之后按照 5.3(b) 的规则计算 E4M3 scale：
+
+$$
+sf8=\mathrm{E4M3}\left(\frac{amax}{6}\right),
+$$
+
+再通过 `__nv_fp4x2_e2m1` 将两个 FP32 一次转换并打包为两个 E2M1 FP4。
+
+因此整个数据流为
+
+```text
+bf16 x
+   ↓
+RMS reduction
+   ↓
+rnorm
+   ↓
+x * rnorm * w
+   ↓
+amax + E4M3 scale
+   ↓
+E2M1 FP4
+```
+
+中间的 RMSNorm 输出始终保留在 kernel 内，不产生 bf16 中间张量。
+
+正确性测试中所有十个 shape 均通过允许 $10^{-4}$ 比例 byte mismatch 的判测。
+
+---
+
+## 3. 公平调参与实验设计
+
+一个重要发现是，如果只优化 fused kernel，而保持题目默认的 baseline 配置，会严重高估融合收益。
+
+### 3.1 Grid 大小
+
+最初 fused kernel 使用：
+
+```cpp
+grid = min(M, 2 * sms);
+```
+
+这种写法本质上让少量 block 以 grid-stride 的方式持续处理多行。
+
+实测发现这种 persistent-style 配置明显不适合本 kernel。例如 `BLOCK=256, M=16384, K=4096`：
+
+| Grid | Fused 时间 |
+|---|---:|
+| $1\times SM$ | 330.34 μs |
+| $2\times SM$ | 185.55 μs |
+| $4\times SM$ | 122.98 μs |
+| $M$ | **106.81 μs** |
+
+随着可调度 block 数增加，性能持续提升，因此最终采用 one-block-per-row：
+
+```cpp
+grid = M;
+```
+
+这说明本 kernel 中 reduction、同步、量化和数据访问具有较长的单-row 执行链，提供更多独立 row block 可以显著提高 GPU 调度自由度和 latency hiding 能力。
+
+### 3.2 Block 大小
+
+进一步测试 `BLOCK=128/256/512`。
+
+对于 fused kernel，大多数中大规模 shape 上 `BLOCK=128` 最优。例如：
+
+$$
+M=16384,\ K=4096
+$$
+
+时：
+
+```text
+BLOCK=512 : 141.19 us
+BLOCK=256 : 106.81 us
+BLOCK=128 :  84.07 us
+```
+
+较小 block 能提供更细粒度的 block-level parallelism。尽管每个线程需要处理更多元素或更多 quant group，但大量独立 row 可以同时参与调度，总吞吐反而更高。
+
+`M=256,K=4096` 是少数 `BLOCK=256` 略优的 shape，因此最终按逐 shape 实测选择 fused block 配置。
+
+### 3.3 两步 baseline
+
+为了保证比较公平，baseline 同样独立调优。
+
+RMSNorm baseline 在大 M 下通常以 `BLOCK=128, grid=M` 更快；小 M 下由于缺乏 row-level parallelism，更大的 BLOCK 能提高单行内部并行度，因此部分 shape 使用 256 或 512。
+
+Standalone NVFP4 quant 对 `BLOCK=128/256/512` 进行了比较，128 在大多数 shape 上最优，因此最终采用：
+
+```cpp
+BLOCK = 128;
+grid = ceil(numGroups / BLOCK);
+```
+
+这一调参非常重要。未优化 baseline 时，大规模 shape 曾表现出接近 $2\times$ 的融合加速；baseline 调优后，加速下降到约 $1.3\sim1.6\times$。这说明如果 baseline 本身处于明显不利的配置，得到的高加速比并不能反映 fusion 的真实收益。
+
+---
+
+## 4. 最终性能结果
+
+最终优化后的结果为：
+
+| M | K | Two-step | Fused | Speedup | 2.56×上限达成率 |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 4096 | 8.21 μs | 6.16 μs | 1.33× | 52.1% |
+| 16 | 4096 | 9.23 μs | 6.16 μs | 1.50× | 58.5% |
+| 256 | 4096 | 11.29 μs | 6.33 μs | **1.78×** | 69.7% |
+| 1024 | 4096 | 16.41 μs | 10.26 μs | 1.60× | 62.5% |
+| 4096 | 4096 | 38.58 μs | 24.96 μs | 1.55× | 60.4% |
+| 16384 | 4096 | 121.60 μs | 84.05 μs | 1.45× | 56.5% |
+| 4096 | 7168 | 61.52 μs | 41.04 μs | 1.50× | 58.6% |
+| 16384 | 7168 | 200.60 μs | 143.29 μs | 1.40× | 54.7% |
+| 4096 | 8192 | 67.82 μs | 45.39 μs | 1.49× | 58.4% |
+| 16384 | 8192 | 221.90 μs | 167.61 μs | **1.32×** | 51.7% |
+
+所有 shape 均明显低于理论的 $2.56\times$。
+
+最高加速出现在
+
+$$
+M=256,K=4096,
+$$
+
+为 $1.78\times$；进入大规模稳态后，融合收益基本下降到
+
+$$
+1.3\sim1.5\times.
+$$
+
+---
+
+## 5. 不同 M 范围的性能分析
+
+### 5.1 小 M：固定延迟主导
+
+最明显的证据是：
+
+```text
+M=1,  K=4096 : fused = 6.16 us
+M=16, K=4096 : fused = 6.16 us
+```
+
+M 增加 16 倍，kernel 时间几乎没有变化。
+
+因此这一区间显然没有达到按数据量伸缩的 steady-state throughput，时间主要由固定开销决定，包括：
+
+- kernel launch 和调度开销；
+- block reduction；
+- warp shuffle；
+- block synchronization；
+- scale 和 FP4 conversion 的固定执行流水。
+
+Two-step 还需要启动 RMSNorm 和 quant 两个 kernel，而 fused 只有一次 launch，因此融合仍有收益，但此时“减少了多少 B/elem”并不是决定性能的主要因素。
+
+所以 $M=1$ 和 $M=16$ 只有 1.33× 和 1.50×，远低于 2.56× 是正常的。
+
+### 5.2 中等 M：融合收益最大
+
+`M=256,K=4096` 时：
+
+$$
+T_{2step}=11.29\ \mu s,
+$$
+
+$$
+T_{fused}=6.33\ \mu s,
+$$
+
+得到最高的
+
+$$
+1.78\times.
+$$
+
+此时 fused 仍然接近约 6 μs 的低 M execution floor，但 two-step 已经开始随着数据量明显增长。
+
+因此这一区间同时受益于：
+
+1. 减少一次 kernel launch；
+2. 消除 bf16 中间值；
+3. 减少 global-memory traffic；
+4. GPU 已经具有一定 row-level parallelism。
+
+随着 M 继续增加到 1024，fused 时间开始明显增长，说明固定开销逐渐被实际吞吐成本取代。
+
+### 5.3 大 M：进入 steady-state，但不是 DRAM-bound
+
+大 M 下的最终加速为：
+
+```text
+16384 × 4096 → 1.45×
+16384 × 7168 → 1.40×
+16384 × 8192 → 1.32×
+```
+
+如果纯字节模型成立，大 M 理应是最接近 2.56× 的区域，但实验结果恰好相反。这说明 kernel 的性能并不满足
+
+$$
+T\propto\text{DRAM bytes}.
+$$
+
+为分析这一问题，对 `M=16384,K=8192` 使用 Nsight Compute 分别 profile RMS baseline、standalone quant 和 fused kernel。
+
+---
+
+## 6. Nsight Compute 分析
+
+NCU 得到的单 kernel 时间为：
+
+| Kernel | Duration |
+|---|---:|
+| RMS baseline | 100.32 μs |
+| NVFP4 quant | 125.47 μs |
+| 两步之和 | 225.79 μs |
+| Fused | 168.16 μs |
+
+因此 NCU 下得到
+
+$$
+\frac{225.79}{168.16}\approx1.34\times,
+$$
+
+与正常 benchmark 中的 1.32× 非常接近。
+
+需要说明的是，NCU 会 replay kernel 以采集不同 counter，因此 profiler 运行时程序自己打印出的端到端计时被严重扰动，不能用于性能比较；这里仅使用 NCU 的单 kernel Duration 和硬件 counter。
+
+### 6.1 Memory 和 Compute 利用率
+
+| Metric | RMS | Quant | Fused |
+|---|---:|---:|---:|
+| Memory Throughput | 74.64% | 65.22% | **77.69%** |
+| DRAM Throughput | **64.54%** | 33.80% | **25.27%** |
+| L1/TEX Throughput | 79.23% | 67.93% | **80.64%** |
+| L2 Throughput | 47.18% | 33.65% | 31.44% |
+| Compute Throughput | 77.34% | 55.74% | 63.23% |
+
+最关键的数据是：
+
+$$
+DRAM_{fused}=25.27\%.
+$$
+
+融合 kernel 的 DRAM 利用率只有约四分之一，说明它根本不是 HBM bandwidth-bound。
+
+与此同时：
+
+$$
+L1/TEX_{fused}=80.64\%,
+$$
+
+已经明显高于 DRAM throughput。
+
+NCU 也直接指出 fused 的 memory side 更繁忙，并建议检查 L1 bottleneck。
+
+因此 fusion 发生了明显的 bottleneck migration：
+
+```text
+Two-step
+    ↓
+较高的 DRAM traffic
+
+消除 bf16 中间值
+    ↓
+DRAM 压力显著下降
+
+Fused
+    ↓
+瓶颈迁移到 L1/TEX + compute + resource latency
+```
+
+这正是 2.56× 理论模型失效的核心原因。
+
+理论模型只计算了 global-memory 字节数，却默认 DRAM bandwidth 是唯一瓶颈。实际 fusion 成功减少 DRAM traffic 后，原来被 DRAM 隐藏的片上访存、conversion、reduction 等成本开始暴露出来，因此无法继续按照字节数线性获得收益。
+
+---
+
+## 7. Occupancy 与寄存器成本
+
+NCU 的 occupancy 数据为：
+
+| Metric | RMS | Quant | Fused |
+|---|---:|---:|---:|
+| Theoretical Occupancy | 100% | 100% | **75%** |
+| Achieved Occupancy | 93.47% | 80.94% | **71.01%** |
+| Active Warps / SM | 59.82 | 51.80 | **45.45** |
+
+Fused kernel 的 theoretical occupancy 被明确报告为 register-limited。
+
+编译阶段的 `ptxas -v` 也显示，早期 512-thread 版本：
+
+```text
+RMS baseline : 32 registers/thread
+Quant        : 31 registers/thread
+Fused        : 40 registers/thread
+```
+
+并且三者均：
+
+```text
+0 bytes spill stores
+0 bytes spill loads
+```
+
+因此问题不是 register spilling，而是：
+
+> Fusion 增加了每线程的 live register set，使得一个 SM 能同时驻留的 warp 数下降。
+
+融合 kernel 中需要同时维护 RMS reduction 状态、`rnorm`、16-element group 的 FP32 中间值、`amax`、scale、FP4 conversion 等状态，因此 resource footprint 必然高于独立的 RMS 或 quant kernel。
+
+这导致 fused 的 active warps 从 RMS 的约 60 warp/SM、quant 的约 52 warp/SM 降至约 45 warp/SM，进一步削弱了隐藏 memory 和 instruction latency 的能力。
+
+---
+
+## 8. 为什么没有达到 2.56×
+
+以 `16384×8192` 为例：
+
+$$
+T_{2step}=221.90\ \mu s,
+$$
+
+如果理想的 2.56× 字节模型完全成立，则预测：
+
+$$
+T_{\mathrm{ideal}}
+=
+\frac{221.90}{2.56}
+\approx86.7\ \mu s.
+$$
+
+而实际：
+
+$$
+T_{\mathrm{fused}}=167.61\ \mu s.
+$$
+
+也就是说，理论模型认为 fusion 应该节省约
+
+$$
+221.90-86.7=135.2\ \mu s,
+$$
+
+而实际上只节省：
+
+$$
+221.90-167.61=54.29\ \mu s.
+$$
+
+理论可节省时间只有大约 40% 被真正兑现。
+
+剩余收益主要消耗在以下几个方面：
+
+1. fused 已经不是 DRAM-bound，DRAM throughput 只有 25.27%；
+2. L1/TEX throughput 达到 80.64%，瓶颈转移到片上 memory pipeline；
+3. RMS reduction 和 block synchronization 并不会因 fusion 消失；
+4. `amax`、E4M3 scale、FP8/FP4 conversion 等计算成本仍然存在；
+5. fusion 增大寄存器 footprint，theoretical occupancy 从 100% 降为 75%；
+6. baseline 在公平调参后本身已经非常快，因此简单比较“2 个 kernel 和 1 个 kernel”会高估融合收益。
+
+因此，2.56× 应理解为一个仅由数据字节数得到的 **memory-only upper bound**，而不是实际 kernel 的性能预测。
+
+---
+
+## 9. 相对 5.3(c) Ceiling Probe 的性能
+
+5.3(c) ceiling probe 保持与 NVFP4 quant 相同的内存形状，但去除了 RMS reduction、scale 计算和 FP4 conversion 等数学操作。其理论访存量为
+
+$$
+2+\frac12+\frac1{16}
+=
+2.5625\ \mathrm{B/elem},
+$$
+
+与本题 fused kernel 的字节账基本一致。因此 probe 可以近似表示：在相同输入输出 memory shape 下，如果只考虑数据搬运，能够达到的性能上限。
+
+实测结果如下：
+
+| M | K | Probe 时间 | Probe 带宽 | Fused 时间 | Fused / Probe |
+|---:|---:|---:|---:|---:|---:|
+| 4096 | 7168 | 22.59 μs | 3330 GB/s | 41.04 μs | **55.0%** |
+| 16384 | 4096 | 45.04 μs | 3818 GB/s | 84.05 μs | **53.6%** |
+| 16384 | 8192 | 84.30 μs | 4080 GB/s | 167.61 μs | **50.3%** |
+
+由于两者处理相同 shape，并具有相同的理论字节数，因此性能比例可以直接由运行时间得到：
+
+$$
+R_{\mathrm{ceiling}}
+=
+\frac{t_{\mathrm{probe}}}
+     {t_{\mathrm{fused}}}.
+$$
+
+例如 `M=16384,K=8192`：
+
+$$
+R_{\mathrm{ceiling}}
+=
+\frac{84.30}{167.61}
+\approx50.3\%.
+$$
+
+因此，在大规模 shape 下，fused kernel 实际只能达到约 **50%–55% 的纯 memory-shape ceiling**。
+
+这一结果进一步证明，fused kernel 的运行时间并不是由理论字节数单独决定的。若其性能完全由内存搬运控制，那么 fused 应当接近 5.3(c) probe；但实际耗时约为 probe 的两倍。
+
+对应的 fused 有效带宽约为：
+
+$$
+3330\times55.0\%\approx1.83\ \mathrm{TB/s},
+$$
+
+$$
+3818\times53.6\%\approx2.05\ \mathrm{TB/s},
+$$
+
+$$
+4080\times50.3\%\approx2.05\ \mathrm{TB/s}.
+$$
+
+尤其是 `16384×8192`，probe 已达到约 4.08 TB/s，而 fused 只有约 2.05 TB/s。两者具有相同的内存字节形状，因此这约一半的差距不能归因于额外 HBM 流量，而来自 fused kernel 本身必须执行的工作，包括：
+
+- RMS 的平方和归约与 block synchronization；
+- `rnorm` 计算；
+- RMSNorm 乘法；
+- 每 16 元素的 `amax` 计算；
+- E4M3 scale conversion；
+- E2M1 FP4 conversion；
+- 更大的寄存器 live set 和由此造成的 occupancy 降低。
+
+这一结果与 Nsight Compute 的观察一致。对于 `16384×8192`，fused 的 DRAM throughput 只有 25.27%，而 L1/TEX throughput 达到 80.64%，说明它并没有接近 HBM bandwidth ceiling。与此同时 fused 的 achieved occupancy 只有 71.01%，低于独立 RMS 和 quant kernel。
+
+因此可以把 5.3(c) probe 和 NCU 两组证据结合起来得到更强的结论：
+
+> fused kernel 虽然已经把理论 HBM traffic 降到了与 ceiling probe 相同的水平，但实际只能达到 probe 约一半的吞吐。这说明融合后性能瓶颈已经从“需要搬多少字节”转移到了 reduction、片上 memory pipeline、quant conversion 和寄存器资源等 kernel 内部开销。
+
+---
+
+## 10. 结论
+
+本实验实现了正确的 fused RMSNorm + NVFP4 quant kernel，并在 B300 上对 fused 与 two-step baseline 分别进行了独立调优。
+
+实验首先说明了公平 baseline 的重要性。未调优时，fusion 一度可以表现出接近 2× 的加速，但在对 RMSNorm、standalone quant、grid 和 block size 分别优化后，大规模 shape 的真实收益下降到约 1.3–1.5×。因此，如果 baseline 本身处于不利配置，会明显高估 fusion 的收益。
+
+不同 M 区间的限制因素不同：小 M 主要受 kernel launch、调度和 reduction 等固定延迟影响；中等 M 下固定开销开始被摊薄，同时 fusion 消除了 bf16 中间值，因此出现最高约 1.78× 的收益；大 M 则进入稳定吞吐区域，但 Nsight Compute 表明 fused 的 DRAM throughput 仅为 25.27%，而 L1/TEX throughput 已达到 80.64%，同时 theoretical occupancy 因寄存器占用下降至 75%。
+
+因此，融合确实成功减少了显存流量，但同时使瓶颈从 HBM traffic 转移到了片上 memory pipeline、计算、同步和寄存器资源。理论上的 2.56× 只描述了字节数减少带来的上限，而没有包含这种 bottleneck migration。
+
+这也解释了相关 fused kernel 在上游工程中可能出现的现象：kernel 数量从两个减少为一个、理论访存量也显著下降，并不意味着端到端运行时间会按相同比例下降。只有当被消除的 HBM traffic 本身确实位于主要性能瓶颈上时，fusion 的理论访存收益才能充分转化为实际加速。
+
+
 Optional：根据分析得到的主要瓶颈进行一次针对性优化，重新测试并更新表格。
 
 :::

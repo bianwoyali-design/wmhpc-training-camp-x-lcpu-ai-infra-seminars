@@ -43,11 +43,25 @@ __global__ void nvfp4_quant_kernel(const __nv_bfloat16 *__restrict__ in,
   const int k0 = k_group * NVFP4_GROUP;
   const int in_base = row * K + k0;
 
+  float4 raw0 = *reinterpret_cast<const float4 *>(in + in_base);
+  float4 raw1 = *reinterpret_cast<const float4 *>(in + in_base + 8);
+
+  const auto *h0 = reinterpret_cast<const __nv_bfloat162 *>(&raw0);
+  const auto *h1 = reinterpret_cast<const __nv_bfloat162 *>(&raw1);
+
   float amax = 0.0f;
 #pragma unroll
-  for (int i = 0; i < NVFP4_GROUP; ++i) {
-    const float v = __bfloat162float(in[in_base + i]);
-    amax = std::fmax(amax, std::fabs(v));
+  for (int i = 0; i < 4; ++i) {
+    float2 f = __bfloat1622float2(h0[i]);
+    amax = fmaxf(amax, fabsf(f.x));
+    amax = fmaxf(amax, fabsf(f.y));
+  }
+
+#pragma unroll
+  for (int i = 0; i < 4; ++i) {
+    float2 f = __bfloat1622float2(h1[i]);
+    amax = fmaxf(amax, fabsf(f.x));
+    amax = fmaxf(amax, fabsf(f.y));
   }
 
   const __nv_fp8_e4m3 sf8(amax / 6.0f);
@@ -60,18 +74,30 @@ __global__ void nvfp4_quant_kernel(const __nv_bfloat16 *__restrict__ in,
   const int out_base = row * (K / 2) + k_group * (NVFP4_GROUP / 2);
 
 #pragma unroll
-  for (int i = 0; i < NVFP4_GROUP; i += 2) {
-    const float x = __bfloat162float(in[in_base + i]) * inv;
-    const float y = __bfloat162float(in[in_base + i + 1]) * inv;
-    const __nv_fp4x2_e2m1 q(make_float2(x, y));
-    dataOut[out_base + i / 2] = q.__x;
+  for (int i = 0; i < 4; ++i) {
+    float2 f = __bfloat1622float2(h0[i]);
+
+    __nv_fp4x2_e2m1 q(
+        make_float2(f.x * inv, f.y * inv));
+
+    dataOut[out_base + i] = q.__x;
+  }
+
+#pragma unroll
+  for (int i = 0; i < 4; ++i) {
+    float2 f = __bfloat1622float2(h1[i]);
+
+    __nv_fp4x2_e2m1 q(
+        make_float2(f.x * inv, f.y * inv));
+
+    dataOut[out_base + 4 + i] = q.__x;
   }
 }
 
 // 判测和 5.4 会按这个签名调用;grid 大小你自己定,写在这里。
 inline void launch_nvfp4_quant(const __nv_bfloat16 *in, uint8_t *dataOut,
                                uint8_t *sfOut, int M, int K, int sms) {
-  constexpr int BLOCK = 256;
+  constexpr int BLOCK = 128;
 
   const int groups_per_row = K / NVFP4_GROUP;
   const int num_groups = M * groups_per_row;
