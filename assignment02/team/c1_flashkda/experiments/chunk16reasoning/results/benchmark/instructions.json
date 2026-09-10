@@ -1,0 +1,13 @@
+{
+  "source_sha256": "98d34b8b98c619b8bf3f1615a146bac810a081ddd986ac0c4ab0d2402c72d30f",
+  "target": "sm_103a",
+  "ptx_mma": [
+    "wmma.mma.sync.aligned.row.row.m16n16k16.f32.bf16.bf16.f32"
+  ],
+  "sass_opcodes": [
+    "HMMA.16816.F32.BF16"
+  ],
+  "static_hmma_count": 388,
+  "note": "Static disassembly of the same source/target/optimization; count is not dynamic executed instruction count.",
+  "collection": "Post-run static check of the exact recorded mma.cu source; not timed under profiling."
+}

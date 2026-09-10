@@ -1,0 +1,75 @@
+{
+  "schema_version": 2,
+  "status": "complete",
+  "device": "NVIDIA B300 SXM6 AC",
+  "device_uuid": "dadf9f3b-df58-d3fa-07b0-5fe223423db1",
+  "multiprocessors": 148,
+  "torch": "2.13.0+cu130",
+  "cuda": "13.0",
+  "settings": {
+    "warps": [
+      1,
+      4,
+      8
+    ],
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "accuracy_batch": 8,
+    "graph_launches": 100,
+    "rounds": 5,
+    "samples": 5,
+    "tokens": [
+      null,
+      8192,
+      786432
+    ],
+    "quick": false
+  },
+  "suites": [
+    "range",
+    "inverse",
+    "mma"
+  ],
+  "build": {
+    "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Wed_Aug_20_01:58:59_PM_PDT_2025\nCuda compilation tools, release 13.0, V13.0.88\nBuild cuda_13.0.r13.0/compiler.36424714_0\n",
+    "flags": [
+      "-O2",
+      "-std=c++17",
+      "--extended-lambda",
+      "-arch=sm_103a",
+      "--shared",
+      "-Xcompiler",
+      "-fPIC",
+      "--ptxas-options=-v"
+    ],
+    "hashes": {
+      "csrc/decay.cu": "3e146e6057f00c5c687e762108be3fe2f1044ca93c2005accd66866418912b53",
+      "csrc/mma.cu": "98d34b8b98c619b8bf3f1615a146bac810a081ddd986ac0c4ab0d2402c72d30f",
+      "csrc/official.cu": "a66076c9db1b542e9e3581c0823d1b984c32fae58cb706ec4a6d9eedf5a306f9",
+      "csrc/unified.cu": "d185f12a07b659e429deea7aac8e83ab589cbbf8832c6d195921f8b379a8b868",
+      "csrc/smxx/utils.cuh": "211cc28d910758e2658a53f5bcda779f1076df281ff75c09ce9bd1638a54151a",
+      "cutlass/include/cutlass/bfloat16.h": "ef3f7262c17ebbbaeb32ecb267c4529279b82aba085b2c13d844b8d12fb53236",
+      "cutlass/include/cute/arch/mma_sm80.hpp": "4d1315c12cccc6652a1dced6d6cb2d13a0390da5829978b5e01895571b677a60"
+    },
+    "cutlass_commit": "5c149f52a436782210263fb2f19b354443a61c6a"
+  },
+  "slurm_job": "25034",
+  "argv": [
+    "assignment02/team/c1_flashkda/experiments/chunk_inverse/run.py",
+    "reproduce"
+  ],
+  "source_hashes": {
+    "report.py": "57059611056b8d1292a09e3f1a44aae5a48e8d5a5c1f140cec630f4a19e4d37b",
+    "experiment.py": "9994b45a0b1b7d2343aa66cb9f6ed7939b396496be046afc4fbb892f66163279",
+    "run.py": "352a8b417fb9dcf5a7cdeb9cd38e0eb62319809ed7cd27e5d67d420839f9d325",
+    "csrc/decay.cu": "3e146e6057f00c5c687e762108be3fe2f1044ca93c2005accd66866418912b53",
+    "csrc/official.cu": "a66076c9db1b542e9e3581c0823d1b984c32fae58cb706ec4a6d9eedf5a306f9",
+    "csrc/mma.cu": "98d34b8b98c619b8bf3f1615a146bac810a081ddd986ac0c4ab0d2402c72d30f",
+    "csrc/unified.cu": "d185f12a07b659e429deea7aac8e83ab589cbbf8832c6d195921f8b379a8b868"
+  },
+  "racecheck": "passed",
+  "timing": "preallocated, hot reused inputs, CUDA Graph launches, randomized configuration order"
+}

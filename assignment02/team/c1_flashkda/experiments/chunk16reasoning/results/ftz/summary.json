@@ -1,0 +1,8 @@
+{
+  "rows": 180,
+  "torch": "2.13.0+cu130",
+  "zero_mask_mismatches": 0,
+  "inf_mask_mismatches": 0,
+  "nan_mask_mismatches": 0,
+  "finite_difference_rows": 0
+}

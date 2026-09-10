@@ -1,0 +1,8 @@
+timestamp, uuid, clocks.current.sm [MHz], power.draw [W], temperature.gpu
+2026/09/10 11:42:38.233, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 250.82 W, 35
+2026/09/10 11:42:38.439, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 298.83 W, 36
+2026/09/10 11:42:38.639, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 403.17 W, 40
+2026/09/10 11:42:38.839, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 504.16 W, 42
+2026/09/10 11:42:39.040, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 597.01 W, 42
+2026/09/10 11:42:39.240, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 687.76 W, 43
+2026/09/10 11:42:39.440, GPU-dadf9f3b-df58-d3fa-07b0-5fe223423db1, 2032 MHz, 728.36 W, 43
