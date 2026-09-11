@@ -199,4 +199,3 @@ def compare(out, mode):
     )
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
-

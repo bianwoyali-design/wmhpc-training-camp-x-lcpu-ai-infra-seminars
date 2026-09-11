@@ -25,7 +25,7 @@ __global__ void official(const float *input, float *output) {
     output[blockIdx.x * 256 + k] = float(ot(k / 16, k % 16));
 }
 extern "C" int launch_official(const float *input, float *output, int batch,
-                      void *stream) {
+                               void *stream) {
   official<<<batch, 32, 0, static_cast<cudaStream_t>(stream)>>>(input, output);
   return int(cudaGetLastError());
 }
