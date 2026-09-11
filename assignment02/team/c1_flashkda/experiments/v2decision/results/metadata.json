@@ -1,0 +1,17 @@
+{
+  "status": "complete",
+  "job": "25528",
+  "device": "_CudaDeviceProperties(name='NVIDIA B300 SXM6 AC', major=10, minor=3, total_memory=274113MB, multi_processor_count=148, uuid=dadf9f3b-df58-d3fa-07b0-5fe223423db1, pci_bus_id=7, pci_device_id=0, pci_domain_id=0, L2_cache_size=126MB)",
+  "uuid": "dadf9f3b-df58-d3fa-07b0-5fe223423db1",
+  "source": {
+    "run.py": "9c1e7fa3b283f78ac4163ff6a82b14ae1dffe06b7687ec5de993c2268a2b901e",
+    "build.py": "16a7dd5b84ca3474cca5947b32e36834cbbc7c8e306533d83da57b0dcdaa1cae"
+  },
+  "binaries": {
+    "0": "88537c10f216dbc22a1ee662c6356510555f5696708ddad57197fe4a314de8ae",
+    "1": "e1e3890c86d6b2275896029e0b944ee46013275d2f6f85a2335999537dbc3ddb",
+    "2": "d03e5c1454e60de2898958b973ed941f8ff9845056bb6698ca74f243cb045ec0",
+    "4": "ab875246eb18da04eb7086aa3fe8dda2ade9afd22657c04ef3c763f67dac85d3"
+  },
+  "extension_sha256": "c9cbdd35bdf68dcccc17194c1dfbfa9ee7ba5cc3f6e2330b52f7e39edbeb3cbd"
+}

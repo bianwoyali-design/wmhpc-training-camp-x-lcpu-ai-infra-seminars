@@ -1,0 +1,176 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi16ELi16ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi16ELi16ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 2576 bytes smem
+ptxas info    : Compile time = 13.056 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi16ELi16ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi16ELi16ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers, used 1 barriers, 7184 bytes smem
+ptxas info    : Compile time = 12.588 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi16ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi16ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 1536 bytes smem
+ptxas info    : Compile time = 6.377 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi16ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi16ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 1 barriers, 3840 bytes smem
+ptxas info    : Compile time = 6.648 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi16ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi16ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 1536 bytes smem
+ptxas info    : Compile time = 5.702 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi16ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi16ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 1536 bytes smem
+ptxas info    : Compile time = 6.166 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi16ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi16ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 1536 bytes smem
+ptxas info    : Compile time = 6.152 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi128ELi128ELi16ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi128ELi128ELi16ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 8208 bytes smem
+ptxas info    : Compile time = 10.831 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi128ELi128ELi16ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi128ELi128ELi16ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 12816 bytes smem
+ptxas info    : Compile time = 12.150 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi128ELi128ELi16ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi128ELi128ELi16ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 5.025 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi128ELi128ELi16ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi128ELi128ELi16ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 4.943 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi128ELi128ELi16ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi128ELi128ELi16ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 5.006 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi128ELi128ELi16ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi128ELi128ELi16ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 4.948 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi128ELi128ELi16ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi128ELi128ELi16ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 6.969 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi128ELi16ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi128ELi16ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 27 registers, used 1 barriers, 4624 bytes smem
+ptxas info    : Compile time = 9.837 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi128ELi16ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi128ELi16ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 1 barriers, 10768 bytes smem
+ptxas info    : Compile time = 11.507 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi16ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi16ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 6912 bytes smem
+ptxas info    : Compile time = 5.336 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi16ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi16ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 7424 bytes smem
+ptxas info    : Compile time = 7.803 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi16ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi16ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 1 barriers, 5120 bytes smem
+ptxas info    : Compile time = 6.237 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi16ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi16ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 5120 bytes smem
+ptxas info    : Compile time = 5.247 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi16ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi16ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 5120 bytes smem
+ptxas info    : Compile time = 6.057 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi128ELi128ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi128ELi128ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 1 barriers, 36880 bytes smem
+ptxas info    : Compile time = 12.853 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi128ELi128ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi128ELi128ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 53776 bytes smem
+ptxas info    : Compile time = 17.194 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi128ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi128ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 90 registers, used 1 barriers, 40960 bytes smem
+ptxas info    : Compile time = 8.369 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi128ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi128ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 80 registers, used 1 barriers, 52224 bytes smem
+ptxas info    : Compile time = 9.710 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi128ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi128ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 79 registers, used 1 barriers, 39168 bytes smem
+ptxas info    : Compile time = 7.558 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi128ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi128ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 86 registers, used 1 barriers, 39168 bytes smem
+ptxas info    : Compile time = 7.969 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi128ELi128ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi128ELi128ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, used 1 barriers, 39168 bytes smem
+ptxas info    : Compile time = 9.087 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi16ELi128ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi16ELi128ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 20496 bytes smem
+ptxas info    : Compile time = 14.176 ms
+ptxas info    : Compiling entry function '_Z10tensor_mmaILi16ELi16ELi128ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z10tensor_mmaILi16ELi16ELi128ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 25104 bytes smem
+ptxas info    : Compile time = 15.888 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi128ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi128ELi4ELb1ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 77 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 7.059 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi128ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi128ELi4ELb0ELb1EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 77 registers, used 1 barriers, 23552 bytes smem
+ptxas info    : Compile time = 8.635 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi128ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi128ELi8ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 77 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 6.641 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi128ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi128ELi4ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 77 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 6.773 ms
+ptxas info    : Compiling entry function '_Z8warp_mmaILi16ELi16ELi128ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi' for 'sm_103a'
+ptxas info    : Function properties for _Z8warp_mmaILi16ELi16ELi128ELi1ELb0ELb0EEvPK13__nv_bfloat16S2_Pfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 77 registers, used 1 barriers, 10496 bytes smem
+ptxas info    : Compile time = 8.699 ms

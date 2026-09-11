@@ -1,0 +1,6 @@
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1735422 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": 0%....50%....100% - 10 passes
+==PROF== Profiling "_flash_kda_fwd_recurrence": 0%....50%....100% - 10 passes
+==PROF== Disconnected from process 1735422
+==PROF== Report: /home/lcpu/73345528/wmhpc-training-camp-x-lcpu-ai-infra-seminars/assignment02/team/c1_flashkda/experiments/bottleneckreasoning/results/memory/h96_n8.ncu-rep

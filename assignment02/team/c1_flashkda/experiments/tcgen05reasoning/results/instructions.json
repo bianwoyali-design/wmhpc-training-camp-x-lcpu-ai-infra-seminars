@@ -1,0 +1,10 @@
+{
+  "target": "sm_103a",
+  "opcodes": [
+    "HMMA.16816.F32.BF16",
+    "UTCHMMA"
+  ],
+  "source_sha256": "53a4a5938acca111cf0f7e61a290fa1030654f02fdc06f6384d347a25f1b3be2",
+  "ptx_tcgen05": true,
+  "note": "Static instructions, not dynamic counts or a throughput measurement."
+}

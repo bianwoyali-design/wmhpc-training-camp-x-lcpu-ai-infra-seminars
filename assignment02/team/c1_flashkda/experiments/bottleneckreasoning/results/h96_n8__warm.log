@@ -1,0 +1,64 @@
+==WARNING== Note: Running with uncontrolled GPU caches. Profiling results may be inconsistent.
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1720585 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 1
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 1
+==PROF== Disconnected from process 1720585
+==PROF== Connected to process 1720973 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 2
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 2
+==PROF== Disconnected from process 1720973
+==PROF== Connected to process 1721239 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 3
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 3
+==PROF== Disconnected from process 1721239
+==PROF== Connected to process 1721595 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 4
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 4
+==PROF== Disconnected from process 1721595
+==PROF== Connected to process 1721693 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 5
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 5
+==PROF== Disconnected from process 1721693
+==PROF== Connected to process 1721804 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 6
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 6
+==PROF== Disconnected from process 1721804
+==PROF== Connected to process 1721918 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 7
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 7
+==PROF== Disconnected from process 1721918
+==PROF== Connected to process 1722034 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 8
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 8
+==PROF== Disconnected from process 1722034
+==PROF== Connected to process 1722236 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 9
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 9
+==PROF== Disconnected from process 1722236
+==PROF== Connected to process 1722535 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 10
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 10
+==PROF== Disconnected from process 1722535
+==PROF== Connected to process 1722724 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 11
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 11
+==PROF== Disconnected from process 1722724
+==PROF== Connected to process 1722901 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 12
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 12
+==PROF== Disconnected from process 1722901
+==PROF== Connected to process 1723299 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 13
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 13
+==PROF== Disconnected from process 1723299
+==PROF== Connected to process 1723429 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 14
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 14
+==PROF== Disconnected from process 1723429
+==PROF== Connected to process 1723561 (/home/lcpu/73345528/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12)
+==PROF== Profiling "_flash_kda_fwd_prepare": Application replay pass 15
+==PROF== Profiling "_flash_kda_fwd_recurrence": Application replay pass 15
+==PROF== Disconnected from process 1723561
+==PROF== Creating report from application replay data: 0%.................100%
+==PROF== Report: /home/lcpu/73345528/wmhpc-training-camp-x-lcpu-ai-infra-seminars/assignment02/team/c1_flashkda/experiments/bottleneckreasoning/results/h96_n8__warm.ncu-rep

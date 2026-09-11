@@ -1,0 +1,97 @@
+{
+  "status": "complete",
+  "job": "25522",
+  "device": "_CudaDeviceProperties(name='NVIDIA B300 SXM6 AC', major=10, minor=3, total_memory=274113MB, multi_processor_count=148, uuid=3924bd78-8b2f-8e85-3f20-8b0687d0bb0a, pci_bus_id=6, pci_device_id=0, pci_domain_id=0, L2_cache_size=126MB)",
+  "uuid": "3924bd78-8b2f-8e85-3f20-8b0687d0bb0a",
+  "torch": "2.13.0+cu130",
+  "cases": [
+    [
+      "nominal_256",
+      "nominal",
+      256
+    ],
+    [
+      "nominal_8192",
+      "nominal",
+      8192
+    ],
+    [
+      "nominal_65536",
+      "nominal",
+      65536
+    ],
+    [
+      "weak_256",
+      "weak",
+      256
+    ],
+    [
+      "weak_8192",
+      "weak",
+      8192
+    ],
+    [
+      "weak_65536",
+      "weak",
+      65536
+    ],
+    [
+      "near_identity_256",
+      "near_identity",
+      256
+    ],
+    [
+      "near_identity_8192",
+      "near_identity",
+      8192
+    ],
+    [
+      "near_identity_65536",
+      "near_identity",
+      65536
+    ],
+    [
+      "nonzero_8192",
+      "nonzero",
+      8192
+    ],
+    [
+      "correlated_8192",
+      "correlated",
+      8192
+    ],
+    [
+      "dynamic_8192",
+      "dynamic",
+      8192
+    ],
+    [
+      "retention_256",
+      "retention",
+      256
+    ],
+    [
+      "retention_8192",
+      "retention",
+      8192
+    ],
+    [
+      "retention_65536",
+      "retention",
+      65536
+    ],
+    [
+      "varlen",
+      "weak",
+      1456
+    ]
+  ],
+  "sources": {
+    "run.py": "6d475fafec1a49380ec66d94303d92429143c52b27489428805dd8a23096a450",
+    "reference.py": "bf7a3b55213dee4f0a079ff574c944fc4dabc06c97cbe7dac99d77d841798650"
+  },
+  "extension_sha256": "c9cbdd35bdf68dcccc17194c1dfbfa9ee7ba5cc3f6e2330b52f7e39edbeb3cbd",
+  "screening_relative_l2": 0.02,
+  "window_tokens": 256,
+  "reference": "CPU FP64; only checkpoint models round state, every 16 tokens"
+}

@@ -1,0 +1,7 @@
+build/
+runs/
+__pycache__/
+!results/*.log
+!results/*.ncu-rep
+!results/memory/*.log
+!results/memory/*.ncu-rep

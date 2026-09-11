@@ -1,0 +1,42 @@
+[
+  {
+    "method": "p0",
+    "threads": 192,
+    "dynamic_shared_bytes": 98432,
+    "compiler": [
+      "    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads",
+      "ptxas info    : Used 73 registers, used 9 barriers",
+      "ptxas info    : Compile time = 69.162 ms"
+    ]
+  },
+  {
+    "method": "p1",
+    "threads": 192,
+    "dynamic_shared_bytes": 98432,
+    "compiler": [
+      "    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads",
+      "ptxas info    : Used 75 registers, used 9 barriers",
+      "ptxas info    : Compile time = 56.405 ms"
+    ]
+  },
+  {
+    "method": "p2",
+    "threads": 128,
+    "dynamic_shared_bytes": 98432,
+    "compiler": [
+      "    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads",
+      "ptxas info    : Used 78 registers, used 9 barriers",
+      "ptxas info    : Compile time = 58.952 ms"
+    ]
+  },
+  {
+    "method": "p4",
+    "threads": 96,
+    "dynamic_shared_bytes": 98432,
+    "compiler": [
+      "    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads",
+      "ptxas info    : Used 90 registers, used 9 barriers",
+      "ptxas info    : Compile time = 99.115 ms"
+    ]
+  }
+]
